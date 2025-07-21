@@ -39,6 +39,7 @@ async function fetchRobloxUser(username) {
 
   while (attempt < maxRetries) {
     try {
+      // Step 1: Search user by username
       const searchResponse = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${username}`);
       const searchData = searchResponse.data;
 
@@ -46,9 +47,14 @@ async function fetchRobloxUser(username) {
         return null;
       }
 
-      const user = searchData.data[0];
-      robloxCache.set(username, user);
-      return user;
+      const userBasic = searchData.data[0];
+
+      // Step 2: Fetch full user details including creation date
+      const userDetailsResponse = await axios.get(`https://users.roblox.com/v1/users/${userBasic.id}`);
+      const userDetails = userDetailsResponse.data;
+
+      robloxCache.set(username, userDetails);
+      return userDetails;
 
     } catch (err) {
       if (err.response?.status === 429) {
@@ -77,16 +83,24 @@ client.on('interactionCreate', async interaction => {
 
   try {
     const user = await fetchRobloxUser(username);
-    if (!user) {
-      return interaction.editReply(`User "${username}" not found or rate limited.`);
+    console.log('User fetched:', user);
+
+    if (!user || !user.created) {
+      return interaction.editReply(`User "${username}" not found or missing creation date.`);
     }
 
-    // Account Age Calculation
     const createdDate = new Date(user.created);
+    console.log('Account created date:', createdDate);
+
+    if (isNaN(createdDate.getTime())) {
+      return interaction.editReply('Invalid account creation date.');
+    }
+
     const now = new Date();
     const diffTime = Math.abs(now - createdDate);
     const diffYears = (diffTime / (1000 * 60 * 60 * 24 * 365)).toFixed(2);
 
+    // Get avatar thumbnail
     const thumbResponse = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png&isCircular=false`);
     const avatarUrl = thumbResponse.data?.data?.[0]?.imageUrl || '';
 
