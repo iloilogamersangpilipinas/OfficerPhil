@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord.js'); // add EmbedBuilder
 require('dotenv').config();
 
 const app = express();
@@ -10,9 +10,11 @@ const PORT = process.env.PORT || 3000;
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,   // To receive messages in guilds
-    GatewayIntentBits.MessageContent   // To read message content
-  ]
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages, // add this to receive DMs
+  ],
+  partials: ['CHANNEL'], // add this so DMs work properly
 });
 
 const philResponses = [
@@ -88,7 +90,6 @@ async function giveMonthlyRewards(client) {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  // Set the bot's status to "Online, Playing Roblox"
   client.user.setPresence({
     activities: [{ name: 'Roblox', type: 0 }],
     status: 'online',
@@ -122,13 +123,45 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.on('messageCreate', message => {
+client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
-  if (/phil/i.test(message.content)) {
-    const response = philResponses[Math.floor(Math.random() * philResponses.length)]
-      .replace('{user}', `<@${message.author.id}>`);
-    message.channel.send(response);
+  if (message.guild) {
+    // Guild message logic: phil keyword
+    if (/phil/i.test(message.content)) {
+      const response = philResponses[Math.floor(Math.random() * philResponses.length)]
+        .replace('{user}', `<@${message.author.id}>`);
+      message.channel.send(response);
+    }
+  } else {
+    // DM message logic: reply with random embed
+    const responses = [
+      "aww.... how sweet of you 💖",
+      "You just made my day brighter!",
+      "Thanks for the love! 😊",
+      "You're awesome, you know that?",
+      "Sending virtual hugs your way 🤗",
+      "I’m blushing! 😳",
+      "You’re too kind!",
+      "Message received with a big smile!",
+      "Keep being amazing!",
+      "You rock! 🤘"
+    ];
+
+    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setTitle("✨ YOU SENT ME A MSG?? ✨")
+      .setDescription(randomResponse)
+      .setColor(0xff69b4)
+      .setTimestamp();
+
+    try {
+      await message.channel.send({ embeds: [embed] });
+    } catch (error) {
+      console.error("Failed to send DM reply:", error);
+    }
   }
 });
 
