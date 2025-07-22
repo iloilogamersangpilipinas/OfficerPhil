@@ -8,7 +8,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,   // Needed to receive messageCreate in guilds
+    GatewayIntentBits.MessageContent   // Needed to read message content
+  ]
 });
 
 const philResponses = [
@@ -86,14 +90,12 @@ client.once('ready', () => {
 
   // Set the bot's status to "Online, Playing Roblox"
   client.user.setPresence({
-    activities: [{ name: 'Roblox', type: 0 }], // Playing Roblox
+    activities: [{ name: 'Roblox', type: 0 }],
     status: 'online',
   });
 
-  // Run on startup (optional)
   giveMonthlyRewards(client);
 
-  // Check every minute if it is 1st day at noon
   setInterval(() => {
     const now = new Date();
     const day = now.getDate();
@@ -120,8 +122,9 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+// Phil message listener (case-insensitive)
 client.on('messageCreate', message => {
-  if (message.author.bot) return; // Ignore other bots
+  if (message.author.bot) return;
 
   if (/phil/i.test(message.content)) {
     const response = philResponses[Math.floor(Math.random() * philResponses.length)]
