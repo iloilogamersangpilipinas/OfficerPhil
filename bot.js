@@ -11,6 +11,14 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent]
 });
 
+const philResponses = [
+  "What's up, {user}?",
+  "Whatcha want, {user}?",
+  "Hey there, {user}!",
+  "Yo, {user}!",
+  "Hello, {user}, how can I help?",
+];
+
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -109,6 +117,16 @@ client.on('interactionCreate', async interaction => {
   } catch (error) {
     console.error(error);
     await interaction.reply({ content: 'Error executing command.', ephemeral: true });
+  }
+});
+
+client.on('messageCreate', message => {
+  if (message.author.bot) return; // Ignore other bots
+
+  if (/phil/i.test(message.content)) {
+    const response = philResponses[Math.floor(Math.random() * philResponses.length)]
+      .replace('{user}', message.author.username);
+    message.channel.send(response);
   }
 });
 
