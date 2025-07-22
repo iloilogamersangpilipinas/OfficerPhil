@@ -4,13 +4,11 @@ const path = require('path');
 
 const dataPath = path.join(__dirname, '..', 'balances.json');
 
-// Load balances from file or create empty object
 function loadBalances() {
   if (!fs.existsSync(dataPath)) return {};
   return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 }
 
-// Save balances to file
 function saveBalances(balances) {
   fs.writeFileSync(dataPath, JSON.stringify(balances, null, 2));
 }
@@ -23,6 +21,14 @@ module.exports = {
       subcommand
         .setName('leaderboard')
         .setDescription('Show top richest users'))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('balance')
+        .setDescription('Check your balance or another user\'s balance')
+        .addUserOption(option =>
+          option.setName('user')
+            .setDescription('User to check balance for')
+            .setRequired(false)))
     .addSubcommand(subcommand =>
       subcommand
         .setName('add-money')
@@ -66,6 +72,18 @@ module.exports = {
         .setTitle('💰 Rich People in the Republic of Supreme Rendezvous')
         .setDescription(description)
         .setColor('Gold')
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed] });
+
+    } else if (interaction.options.getSubcommand() === 'balance') {
+      const user = interaction.options.getUser('user') || interaction.user;
+      const balance = balances[user.id] || 0;
+
+      const embed = new EmbedBuilder()
+        .setColor('Blue')
+        .setTitle('🏦 Account Balance')
+        .setDescription(`**${user.tag}** has a balance of **${currency}${balance}**`)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
