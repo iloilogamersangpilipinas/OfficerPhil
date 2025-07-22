@@ -26,13 +26,10 @@ module.exports = {
       .setColor(0x1D82B6);
 
     try {
-      // Ping user first in DM
-      await targetUser.send(`<@${targetUser.id}>`);
-
-      // Send the embed
+      // Send the embed as DM to the target user
       await targetUser.send({ embeds: [embed] });
 
-      await interaction.reply({ content: `Your letter was sent to ${targetUser}.`, ephemeral: true });
+      await interaction.reply({ content: `Your letter was sent to ${targetUser.tag}.`, ephemeral: true });
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: `I couldn't send a DM to ${targetUser.tag}. They might have DMs disabled.`, ephemeral: true });
