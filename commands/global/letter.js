@@ -50,17 +50,20 @@ module.exports = {
     const formattedTimestamp = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: true });
 
     const embed = new EmbedBuilder()
-      .setColor(0x00AE86)
-      .setDescription(`**${sender.tag}** has sent you a message.\n\n**The letter says:**\n*${messageContent}*\n\n${formattedTimestamp}`)
-      .setTimestamp(now);
+  .setTitle(`**${sender.username} has sent you a message.**`)
+  .setDescription(`The letter says:\n"${messageContent}"`)
+  .setFooter({ text: now.toLocaleString('en-US', { timeZone: 'UTC', hour12: true }) })
+  .setColor(0x00AE86);
 
     try {
-  await recipient.send({ content: `<@${recipient.id}>`, embeds: [embed] });
-  await interaction.reply({ content: `Your letter has been sent to <@${recipient.id}>!`, ephemeral: true });
-} catch (error) {
-  console.error('Error sending DM:', error);
-  await interaction.reply({
-    content: `Failed to send DM to <@${recipient.id}>. They might have DMs disabled.`,
-    ephemeral: true,
-  });
-}
+      await recipient.send({ content: `<@${recipient.id}>`, embeds: [embed] });
+      await interaction.reply({ content: `Your letter has been sent to <@${recipient.id}>!`, ephemeral: true });
+    } catch (error) {
+      console.error('Error sending DM:', error);
+      await interaction.reply({
+        content: `Failed to send DM to <@${recipient.id}>. They might have DMs disabled.`,
+        ephemeral: true,
+      });
+    }
+  }, // closes async execute
+}; // closes module.exports
