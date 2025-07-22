@@ -76,6 +76,12 @@ async function giveMonthlyRewards(client) {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
+  // Set the bot's status to "Online, Playing Roblox"
+  client.user.setPresence({
+    activities: [{ name: 'Roblox', type: 0 }], // Playing Roblox
+    status: 'online',
+  });
+
   // Run on startup (optional)
   giveMonthlyRewards(client);
 
