@@ -13,7 +13,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
-  partials: [Partials.Channel]  // For DMs if needed
+  partials: [Partials.Channel],  // For DMs if needed
 });
 
 // Phil message responses
@@ -25,22 +25,35 @@ const philResponses = [
   "Hello, {user}, how can I help?",
 ];
 
+// Load commands from guildOnly and global subfolders
 client.commands = new Collection();
 
-// Load all commands from 'commands' folder (either flatten or separate folders)
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.existsSync(commandsPath) ? fs.readdirSync(commandsPath).filter(file => file.endsWith('.js')) : [];
+const guildOnlyPath = path.join(__dirname, 'commands', 'guildOnly');
+const globalPath = path.join(__dirname, 'commands', 'global');
 
-for (const file of commandFiles) {
-  const command = require(path.join(commandsPath, file));
-  client.commands.set(command.data.name, command);
+function loadCommands(dir) {
+  if (!fs.existsSync(dir)) return;
+  const files = fs.readdirSync(dir).filter(file => file.endsWith('.js'));
+  for (const file of files) {
+    const command = require(path.join(dir, file));
+    if (command.data && command.execute) {
+      client.commands.set(command.data.name, command);
+    } else {
+      console.log(`Skipping invalid command file: ${file}`);
+    }
+  }
 }
+
+loadCommands(guildOnlyPath);
+loadCommands(globalPath);
+
+console.log('Loaded commands:', [...client.commands.keys()]);
 
 // Simple web server for uptime
 app.get('/', (req, res) => res.send('Bot is running'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// Economy system stuff (keep as you had it)
+// Economy system stuff
 const dataPath = path.join(__dirname, 'balances.json');
 const rewardInfoPath = path.join(__dirname, 'rewardInfo.json');
 const monthlyAmount = 1000;
@@ -110,13 +123,19 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
+  console.log(`Interaction received: ${interaction.commandName}`);
+
   const command = client.commands.get(interaction.commandName);
-  if (!command) return;
+  if (!command) {
+    console.log(`No command matching ${interaction.commandName} found`);
+    return;
+  }
 
   try {
     await command.execute(interaction);
+    console.log(`Executed command: ${interaction.commandName}`);
   } catch (error) {
-    console.error(error);
+    console.error('Error executing command:', error);
     await interaction.reply({ content: 'Error executing command.', ephemeral: true });
   }
 });
