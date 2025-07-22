@@ -27,13 +27,16 @@ module.exports = {
     const recipient = interaction.options.getUser('recipient');
     const messageContent = interaction.options.getString('message');
 
+    // Get the server name where the command was used
+    const serverName = interaction.guild ? interaction.guild.name : 'a Discord server';
+
     if (recipient.bot) {
       const randomSweet = sweetMessages[Math.floor(Math.random() * sweetMessages.length)];
       const sweetEmbed = new EmbedBuilder()
         .setTitle("💖 Sweet Message Just For You!")
         .setDescription(randomSweet)
         .setColor(0xFFC0CB)
-        .setFooter({ text: "Your kindness is appreciated!" })
+        .setFooter({ text: "Your kindness is appreciated!" }) // Keep this one as is or change if you prefer
         .setTimestamp();
 
       try {
@@ -46,14 +49,12 @@ module.exports = {
       return;
     }
 
-    const now = new Date();
-    const formattedTimestamp = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: true });
-
     const embed = new EmbedBuilder()
-  .setTitle(`**${sender.username} has sent you a message.**`)
-  .setDescription(`The letter says:\n"${messageContent}"`)
-  .setFooter({ text: now.toLocaleString('en-US', { timeZone: 'UTC', hour12: true }) })
-  .setColor(0x00AE86);
+      .setTitle(`**${sender.username} has sent you a message.**`)
+      .setDescription(`The letter says:\n"${messageContent}"`)
+      .setFooter({ text: `Sent from ${serverName}` }) // <-- Changed this line
+      .setColor(0x00AE86)
+      .setTimestamp();
 
     try {
       await recipient.send({ content: `<@${recipient.id}>`, embeds: [embed] });
