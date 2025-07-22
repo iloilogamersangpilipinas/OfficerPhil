@@ -55,11 +55,12 @@ module.exports = {
       .setTimestamp(now);
 
     try {
-      await recipient.send({ content: `<@${recipient.id}>`, embeds: [embed] });
-      await interaction.reply({ content: `Your letter has been sent to ${recipient.tag}!`, ephemeral: true });
-    } catch (error) {
-      console.error('Error sending DM:', error);
-      await interaction.reply({ content: 'Failed to send DM. The user may have DMs disabled.', ephemeral: true });
-    }
-  },
-};
+  await recipient.send({ content: `<@${recipient.id}>`, embeds: [embed] });
+  await interaction.reply({ content: `Your letter has been sent to <@${recipient.id}>!`, ephemeral: true });
+} catch (error) {
+  console.error('Error sending DM:', error);
+  await interaction.reply({
+    content: `Failed to send DM to <@${recipient.id}>. They might have DMs disabled.`,
+    ephemeral: true,
+  });
+}
