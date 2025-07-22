@@ -10,8 +10,8 @@ const PORT = process.env.PORT || 3000;
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,   // Needed to receive messageCreate in guilds
-    GatewayIntentBits.MessageContent   // Needed to read message content
+    GatewayIntentBits.GuildMessages,   // To receive messages in guilds
+    GatewayIntentBits.MessageContent   // To read message content
   ]
 });
 
@@ -122,13 +122,12 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Phil message listener (case-insensitive)
 client.on('messageCreate', message => {
   if (message.author.bot) return;
 
   if (/phil/i.test(message.content)) {
     const response = philResponses[Math.floor(Math.random() * philResponses.length)]
-      .replace('{user}', message.author.username);
+      .replace('{user}', `<@${message.author.id}>`);
     message.channel.send(response);
   }
 });
