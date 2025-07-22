@@ -63,9 +63,10 @@ module.exports = {
       }
 
       const embed = new EmbedBuilder()
-        .setTitle('💰 Rich Leaderboard')
+        .setTitle('💰 Rich People in the Republic of Supreme Rendezvous')
         .setDescription(description)
-        .setColor('Gold');
+        .setColor('Gold')
+        .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
 
@@ -83,7 +84,13 @@ module.exports = {
       balances[user.id] += amount;
       saveBalances(balances);
 
-      await interaction.reply(`Added ${currency}${amount} to ${user.tag}. New balance: ${currency}${balances[user.id]}`);
+      const embed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('💸 Money Added')
+        .setDescription(`Added **${currency}${amount}** to **${user.tag}**.\nNew Balance: **${currency}${balances[user.id]}**`)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed] });
 
     } else if (interaction.options.getSubcommand() === 'remove-money') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -101,7 +108,13 @@ module.exports = {
       if (balances[user.id] < 0) balances[user.id] = 0;
       saveBalances(balances);
 
-      await interaction.reply(`Removed ${currency}${amount} from ${user.tag}. New balance: ${currency}${balances[user.id]}`);
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('🧾 Money Removed')
+        .setDescription(`Removed **${currency}${amount}** from **${user.tag}**.\nNew Balance: **${currency}${balances[user.id]}**`)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed] });
     }
   }
 };
