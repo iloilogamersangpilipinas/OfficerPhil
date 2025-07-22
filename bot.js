@@ -1,131 +1,41 @@
-require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent]
 });
 
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const robloxCache = new Map();
+client.commands = new Collection();
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-app.get('/', (req, res) => {
-  res.send('Bot is running');
-});
-
-app.listen(PORT, () => {
-  console.log(`Express server running on port ${PORT}`);
-});
-
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-});
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-async function fetchRobloxUser(username) {
-  if (robloxCache.has(username)) {
-    console.log(`Cache hit for ${username}`);
-    return robloxCache.get(username);
-  }
-
-  console.log(`Fetching Roblox data for ${username}`);
-  const maxRetries = 3;
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
-    try {
-      // Step 1: Search user by username
-      const searchResponse = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${username}`);
-      const searchData = searchResponse.data;
-
-      if (!searchData.data || searchData.data.length === 0) {
-        return null;
-      }
-
-      const userBasic = searchData.data[0];
-
-      // Step 2: Fetch full user details including creation date
-      const userDetailsResponse = await axios.get(`https://users.roblox.com/v1/users/${userBasic.id}`);
-      const userDetails = userDetailsResponse.data;
-
-      robloxCache.set(username, userDetails);
-      return userDetails;
-
-    } catch (err) {
-      if (err.response?.status === 429) {
-        console.log(`Rate limited! Retrying after ${1000 * (attempt + 1)}ms`);
-        await delay(1000 * (attempt + 1));
-      } else {
-        console.error('Error fetching Roblox user:', err);
-        break;
-      }
-    }
-    attempt++;
-  }
-  return null;
+for (const file of commandFiles) {
+  const command = require(path.join(commandsPath, file));
+  client.commands.set(command.data.name, command);
 }
 
+app.get('/', (req, res) => res.send('Bot is running'));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+client.once('ready', () => console.log(`Logged in as ${client.user.tag}!`));
+
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
-  if (interaction.commandName !== 'robloxinfo') return;
+  if (!interaction.isChatInputCommand()) return;
 
-  const username = interaction.options.getString('username');
-  if (!username) {
-    return interaction.reply('Please provide a Roblox username.');
-  }
-
-  await interaction.deferReply();
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
 
   try {
-    const user = await fetchRobloxUser(username);
-    console.log('User fetched:', user);
-
-    if (!user || !user.created) {
-      return interaction.editReply(`User "${username}" not found or missing creation date.`);
-    }
-
-    const createdDate = new Date(user.created);
-    console.log('Account created date:', createdDate);
-
-    if (isNaN(createdDate.getTime())) {
-      return interaction.editReply('Invalid account creation date.');
-    }
-
-    const now = new Date();
-    const diffTime = Math.abs(now - createdDate);
-    const diffYears = (diffTime / (1000 * 60 * 60 * 24 * 365)).toFixed(2);
-
-    // Get avatar thumbnail
-    const thumbResponse = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png&isCircular=false`);
-    const avatarUrl = thumbResponse.data?.data?.[0]?.imageUrl || '';
-
-    const embed = new EmbedBuilder()
-      .setColor('#014aad')
-      .setTitle(`Roblox User Info: ${user.name}`)
-      .setThumbnail(avatarUrl)
-      .addFields(
-        { name: 'Username', value: user.name, inline: false },
-        { name: 'User ID', value: user.id.toString(), inline: true },
-        { name: 'Account Age', value: `${diffYears} years`, inline: true }
-      )
-      .setFooter({ text: 'Data provided by Roblox API' })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
-
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    await interaction.editReply('There was an error fetching Roblox info. Please try again later.');
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({ content: 'Error executing command.', ephemeral: true });
   }
 });
 
-process.on('unhandledRejection', err => {
-  console.error('Unhandled promise rejection:', err);
-});
-
-client.login(DISCORD_BOT_TOKEN);
+client.login(process.env.DISCORD_BOT_TOKEN);
