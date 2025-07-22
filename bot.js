@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
 require('dotenv').config();
 
 const app = express();
@@ -10,13 +10,13 @@ const PORT = process.env.PORT || 3000;
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,    // To receive messages in guilds
-    GatewayIntentBits.MessageContent,    // To read message content
-    GatewayIntentBits.DirectMessages      // To receive direct messages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
-  partials: ['CHANNEL'],                 // Needed to receive DMs properly
+  partials: [Partials.Channel]  // For DMs if needed
 });
 
+// Phil message responses
 const philResponses = [
   "What's up, {user}?",
   "Whatcha want, {user}?",
@@ -26,19 +26,21 @@ const philResponses = [
 ];
 
 client.commands = new Collection();
+
+// Load all commands from 'commands' folder (either flatten or separate folders)
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandFiles = fs.existsSync(commandsPath) ? fs.readdirSync(commandsPath).filter(file => file.endsWith('.js')) : [];
 
 for (const file of commandFiles) {
   const command = require(path.join(commandsPath, file));
   client.commands.set(command.data.name, command);
 }
 
-// Simple web server for uptime monitoring
+// Simple web server for uptime
 app.get('/', (req, res) => res.send('Bot is running'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// Economy reward system files & variables
+// Economy system stuff (keep as you had it)
 const dataPath = path.join(__dirname, 'balances.json');
 const rewardInfoPath = path.join(__dirname, 'rewardInfo.json');
 const monthlyAmount = 1000;
@@ -62,7 +64,7 @@ function saveRewardInfo(info) {
   fs.writeFileSync(rewardInfoPath, JSON.stringify(info, null, 2));
 }
 
-async function giveMonthlyRewards(client) {
+async function giveMonthlyRewards() {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -90,22 +92,17 @@ async function giveMonthlyRewards(client) {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  // Set the bot's status to "Online, Playing Roblox"
   client.user.setPresence({
     activities: [{ name: 'Roblox', type: 0 }],
     status: 'online',
   });
 
-  giveMonthlyRewards(client);
+  giveMonthlyRewards();
 
   setInterval(() => {
     const now = new Date();
-    const day = now.getDate();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-
-    if (day === 1 && hour === 12 && minute === 0) {
-      giveMonthlyRewards(client);
+    if (now.getDate() === 1 && now.getHours() === 12 && now.getMinutes() === 0) {
+      giveMonthlyRewards();
     }
   }, 60 * 1000);
 });
@@ -124,44 +121,13 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.on('messageCreate', async (message) => {
+client.on('messageCreate', message => {
   if (message.author.bot) return;
 
-  if (message.guild) {
-    // Guild message: respond to "phil"
-    if (/phil/i.test(message.content)) {
-      const response = philResponses[Math.floor(Math.random() * philResponses.length)]
-        .replace('{user}', `<@${message.author.id}>`);
-      message.channel.send(response).catch(console.error);
-    }
-  } else {
-    // DM message: respond with cute embed safely, without blocking slash commands
-    try {
-      const responses = [
-        "aww.... how sweet of you 💖",
-        "You just made my day brighter!",
-        "Thanks for the love! 😊",
-        "You're awesome, you know that?",
-        "Sending virtual hugs your way 🤗",
-        "I’m blushing! 😳",
-        "You’re too kind!",
-        "Message received with a big smile!",
-        "Keep being amazing!",
-        "You rock! 🤘"
-      ];
-
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-
-      const embed = new EmbedBuilder()
-        .setTitle("✨ YOU SENT ME A MSG?? ✨")
-        .setDescription(randomResponse)
-        .setColor(0xff69b4)
-        .setTimestamp();
-
-      await message.channel.send({ embeds: [embed] });
-    } catch (error) {
-      console.error('Error responding to DM:', error);
-    }
+  if (message.guild && /phil/i.test(message.content)) {
+    const response = philResponses[Math.floor(Math.random() * philResponses.length)]
+      .replace('{user}', `<@${message.author.id}>`);
+    message.channel.send(response).catch(console.error);
   }
 });
 
