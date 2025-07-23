@@ -1,31 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const axios = require('axios');
+const db = require('../../db'); // adjust path if needed
 
-const BIN_ID = process.env.JSONBIN_ID;
-const MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
 const currency = 'SR £';
-
-async function loadBalances() {
-  try {
-    const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': MASTER_KEY }
-    });
-    return res.data.record || {};
-  } catch (err) {
-    console.error('Error loading balances from JSONBin:', err);
-    return {};
-  }
-}
-
-async function saveBalances(balances) {
-  try {
-    await axios.put(`https://api.jsonbin.io/v3/b/${BIN_ID}`, balances, {
-      headers: { 'X-Master-Key': MASTER_KEY }
-    });
-  } catch (err) {
-    console.error('Error saving balances to JSONBin:', err);
-  }
-}
 
 function getBalanceFootnote(balance) {
   if (balance >= 100000) {
@@ -98,22 +74,21 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const balances = await loadBalances();
-
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'leaderboard') {
-      const sorted = Object.entries(balances)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10);
-
-      if (sorted.length === 0) {
+      let balances = db.getAllBalances();
+      if (balances.length === 0) {
         return interaction.reply('No balances recorded yet.');
       }
 
+      // Sort descending by balance and get top 10
+      balances.sort((a, b) => b.balance - a.balance);
+      balances = balances.slice(0, 10);
+
       let description = '';
-      for (let i = 0; i < sorted.length; i++) {
-        const [userId, balance] = sorted[i];
+      for (let i = 0; i < balances.length; i++) {
+        const { userId, balance } = balances[i];
         let userTag;
         try {
           const user = await interaction.client.users.fetch(userId);
@@ -134,7 +109,7 @@ module.exports = {
 
     } else if (subcommand === 'balance') {
       const user = interaction.options.getUser('user') || interaction.user;
-      const balance = balances[user.id] || 0;
+      const balance = db.getBalance(user.id);
 
       const footnote = getBalanceFootnote(balance);
 
@@ -154,17 +129,16 @@ module.exports = {
 
       const user = interaction.options.getUser('user');
       const amount = interaction.options.getInteger('amount');
-
       if (amount <= 0) return interaction.reply({ content: 'Amount must be greater than zero.', ephemeral: true });
 
-      if (!balances[user.id]) balances[user.id] = 0;
-      balances[user.id] += amount;
-      await saveBalances(balances);
+      db.addBalance(user.id, amount);
+
+      const newBalance = db.getBalance(user.id);
 
       const embed = new EmbedBuilder()
         .setColor('Green')
         .setTitle('💸 Money Added')
-        .setDescription(`Added **${currency}${amount}** to **${user.tag}**.\nNew Balance: **${currency}${balances[user.id]}**`)
+        .setDescription(`Added **${currency}${amount}** to **${user.tag}**.\nNew Balance: **${currency}${newBalance}**`)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
@@ -176,19 +150,16 @@ module.exports = {
 
       const user = interaction.options.getUser('user');
       const amount = interaction.options.getInteger('amount');
-
       if (amount <= 0) return interaction.reply({ content: 'Amount must be greater than zero.', ephemeral: true });
 
-      if (!balances[user.id]) balances[user.id] = 0;
-
-      balances[user.id] -= amount;
-      if (balances[user.id] < 0) balances[user.id] = 0;
-      await saveBalances(balances);
+      const current = db.getBalance(user.id);
+      const newAmount = Math.max(0, current - amount);
+      db.setBalance(user.id, newAmount);
 
       const embed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('🧾 Money Removed')
-        .setDescription(`Removed **${currency}${amount}** from **${user.tag}**.\nNew Balance: **${currency}${balances[user.id]}**`)
+        .setDescription(`Removed **${currency}${amount}** from **${user.tag}**.\nNew Balance: **${currency}${newAmount}**`)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
@@ -203,14 +174,10 @@ module.exports = {
         return interaction.reply({ content: 'Amount must be greater than zero.', ephemeral: true });
       }
 
-      // Add amount to every user in balances
-      for (const userId in balances) {
-        if (Object.hasOwnProperty.call(balances, userId)) {
-          balances[userId] += amount;
-        }
+      const balances = db.getAllBalances();
+      for (const { userId, balance } of balances) {
+        db.setBalance(userId, balance + amount);
       }
-
-      await saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Green')

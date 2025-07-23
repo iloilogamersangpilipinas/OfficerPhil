@@ -4,15 +4,6 @@ const express = require('express');
 const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
 require('dotenv').config();
 
-console.log('JSONBIN_ID:', process.env.JSONBIN_ID);
-console.log('JSONBIN_MASTER_KEY:', process.env.JSONBIN_MASTER_KEY);
-console.log('DISCORD_BOT_TOKEN:', process.env.DISCORD_BOT_TOKEN ? 'Loaded' : 'MISSING!');
-
-if (!process.env.DISCORD_BOT_TOKEN || !process.env.JSONBIN_ID || !process.env.JSONBIN_MASTER_KEY) {
-  console.error('❌ One or more required environment variables are missing. Please check your .env or Render environment variables.');
-  process.exit(1);
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
