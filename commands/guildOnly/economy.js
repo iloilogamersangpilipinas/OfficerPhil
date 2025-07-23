@@ -105,6 +105,14 @@ module.exports = {
         .setColor('Gold')
         .setTimestamp();
 
+      // Set top user's avatar as thumbnail
+      try {
+        const topUser = await interaction.client.users.fetch(balances[0].userId);
+        embed.setThumbnail(topUser.displayAvatarURL({ extension: 'png', size: 512 }));
+      } catch {
+        // silently ignore if fetch fails
+      }
+
       await interaction.reply({ embeds: [embed] });
 
     } else if (subcommand === 'balance') {
@@ -118,7 +126,8 @@ module.exports = {
         .setTitle('🏦 Account Balance')
         .setDescription(`**${user.tag}** has a balance of **${currency}${balance}**`)
         .setFooter({ text: footnote })
-        .setTimestamp();
+        .setTimestamp()
+        .setThumbnail(user.displayAvatarURL({ extension: 'png', size: 512 }));
 
       await interaction.reply({ embeds: [embed] });
 
@@ -139,7 +148,8 @@ module.exports = {
         .setColor('Green')
         .setTitle('💸 Money Added')
         .setDescription(`Added **${currency}${amount}** to **${user.tag}**.\nNew Balance: **${currency}${newBalance}**`)
-        .setTimestamp();
+        .setTimestamp()
+        .setThumbnail(user.displayAvatarURL({ extension: 'png', size: 512 }));
 
       await interaction.reply({ embeds: [embed] });
 
@@ -160,7 +170,8 @@ module.exports = {
         .setColor('Red')
         .setTitle('🧾 Money Removed')
         .setDescription(`Removed **${currency}${amount}** from **${user.tag}**.\nNew Balance: **${currency}${newAmount}**`)
-        .setTimestamp();
+        .setTimestamp()
+        .setThumbnail(user.displayAvatarURL({ extension: 'png', size: 512 }));
 
       await interaction.reply({ embeds: [embed] });
 
