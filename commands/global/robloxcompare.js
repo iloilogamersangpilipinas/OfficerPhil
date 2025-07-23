@@ -5,7 +5,7 @@ const cooldowns = new Map();
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('compare')
+    .setName('robloxcompare')
     .setDescription('Compare two Roblox users')
     .addStringOption(option =>
       option.setName('user1')
@@ -34,11 +34,12 @@ module.exports = {
 
     // Helper to get userId from username
     async function getUserId(username) {
-      const res = await fetch(`https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(username)}`);
-      const data = await res.json();
-      if (data.success === false || !data.Id) throw new Error(`User "${username}" not found`);
-      return data.Id;
-    }
+  const res = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=1`);
+  if (!res.ok) throw new Error(`Failed to search for user "${username}"`);
+  const data = await res.json();
+  if (!data.data || data.data.length === 0) throw new Error(`User "${username}" not found`);
+  return data.data[0].id;
+}
 
     // Helper to get user info: join date
     async function getUserInfo(userId) {
