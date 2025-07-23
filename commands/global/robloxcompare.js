@@ -4,6 +4,7 @@ const axios = require('axios');
 const robloxCache = new Map();
 const robloxCooldowns = new Map();
 const userCooldowns = new Map();
+
 const COOLDOWN_TIME = 60; // seconds
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -29,7 +30,7 @@ module.exports = {
     const discordUserId = interaction.user.id;
     const now = Math.floor(Date.now() / 1000);
 
-    // User cooldown check
+    // User cooldown check (reply immediately if cooldown)
     const userLastUsed = userCooldowns.get(discordUserId);
     if (userLastUsed && now - userLastUsed < COOLDOWN_TIME) {
       const remaining = COOLDOWN_TIME - (now - userLastUsed);
@@ -41,18 +42,19 @@ module.exports = {
     }
     userCooldowns.set(discordUserId, now);
 
-    // Get and validate usernames
-    let username1 = interaction.options.getString('user1').trim();
-    let username2 = interaction.options.getString('user2').trim();
+    // Validate usernames early (reply immediately if invalid)
+    const username1 = interaction.options.getString('user1').trim();
+    const username2 = interaction.options.getString('user2').trim();
 
     if (!isValidRobloxUsername(username1) || !isValidRobloxUsername(username2)) {
-      return interaction.reply({ content: '❌ One or both usernames are invalid Roblox usernames. Usernames must be 3-20 characters long and contain only letters, numbers, or underscores.', ephemeral: true });
+      return interaction.reply({ content: '❌ One or both usernames are invalid Roblox usernames. Usernames must be 3-20 characters, letters/numbers/underscores only.', ephemeral: true });
     }
 
+    // Defer reply because of potentially long Roblox API calls
     await interaction.deferReply();
 
     try {
-      // Fetch both users' basic info
+      // Fetch users concurrently
       const [user1, user2] = await Promise.all([
         fetchRobloxUserWithCooldown(username1, now),
         fetchRobloxUserWithCooldown(username2, now)
@@ -61,7 +63,7 @@ module.exports = {
       if (!user1) return interaction.editReply(`❌ User "${username1}" not found.`);
       if (!user2) return interaction.editReply(`❌ User "${username2}" not found.`);
 
-      // Fetch only groups, badges, avatar price concurrently
+      // Fetch groups, badges, avatar price concurrently
       const [
         groups1, groups2,
         badges1, badges2,
@@ -79,6 +81,7 @@ module.exports = {
         return price.toLocaleString() + ' R$';
       }
 
+      // Build and send embed
       const embed = new EmbedBuilder()
         .setAuthor({ 
           name: `Roblox User Comparison: ${username1} vs ${username2}`, 
@@ -94,7 +97,6 @@ module.exports = {
         .setTimestamp();
 
       return interaction.editReply({ embeds: [embed] });
-
     } catch (err) {
       console.error('Roblox Compare Error:', err);
       return interaction.editReply('❌ An error occurred while fetching Roblox user data. Please try again later.');
@@ -102,6 +104,7 @@ module.exports = {
   }
 };
 
+// Fetch Roblox user with cooldown and cache, retries on 429, handles 400 as not found
 async function fetchRobloxUserWithCooldown(username, now) {
   const lastUsed = robloxCooldowns.get(username);
   if (lastUsed && now - lastUsed < COOLDOWN_TIME && robloxCache.has(username)) {
@@ -127,10 +130,9 @@ async function fetchRobloxUserWithCooldown(username, now) {
 
     } catch (err) {
       if (err.response?.status === 429) {
-        await delay(1000 * (attempt + 1));
+        await delay(1000 * (attempt + 1)); // backoff
       } else if (err.response?.status === 400) {
-        console.warn(`Roblox API returned 400 Bad Request for username "${username}". Treating as not found.`);
-        break;
+        break; // treat as not found, no retries
       } else {
         console.error(`Error fetching user "${username}":`, err.message);
         break;
