@@ -2,6 +2,8 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('disc
 const db = require('../../db'); // adjust path if needed
 
 const currency = 'SR £';
+const DAILY_AMOUNT = 1000;
+const DAILY_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours in ms
 
 function getBalanceFootnote(balance) {
   if (balance >= 100000) {
@@ -39,17 +41,13 @@ module.exports = {
     .setName('economy')
     .setDescription('Economy commands')
     .addSubcommand(subcommand =>
-      subcommand
-        .setName('leaderboard')
-        .setDescription('Show top richest users'))
+      subcommand.setName('leaderboard').setDescription('Show top richest users'))
     .addSubcommand(subcommand =>
       subcommand
         .setName('balance')
         .setDescription('Check your balance or another user\'s balance')
         .addUserOption(option =>
-          option.setName('user')
-            .setDescription('User to check balance for')
-            .setRequired(false)))
+          option.setName('user').setDescription('User to check balance for').setRequired(false)))
     .addSubcommand(subcommand =>
       subcommand
         .setName('add-money')
@@ -70,8 +68,11 @@ module.exports = {
           option.setName('amount')
             .setDescription('Amount to add to every user')
             .setRequired(true)
-        )
-    ),
+        ))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('daily')
+        .setDescription('Claim your daily 1000 SR £ reward')),
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -82,7 +83,6 @@ module.exports = {
         return interaction.reply('No balances recorded yet.');
       }
 
-      // Sort descending by balance and get top 10
       balances.sort((a, b) => b.balance - a.balance);
       balances = balances.slice(0, 10);
 
@@ -105,12 +105,11 @@ module.exports = {
         .setColor('Gold')
         .setTimestamp();
 
-      // Set top user's avatar as thumbnail
       try {
         const topUser = await interaction.client.users.fetch(balances[0].userId);
         embed.setThumbnail(topUser.displayAvatarURL({ extension: 'png', size: 512 }));
       } catch {
-        // silently ignore if fetch fails
+        // silently ignore
       }
 
       await interaction.reply({ embeds: [embed] });
@@ -197,6 +196,35 @@ module.exports = {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
+
+    } else if (subcommand === 'daily') {
+      const userId = interaction.user.id;
+      const now = Date.now();
+      const lastClaim = db.getLastDaily(userId);
+
+      if (now - lastClaim < DAILY_COOLDOWN) {
+        const remaining = DAILY_COOLDOWN - (now - lastClaim);
+        const hours = Math.floor(remaining / 3600000);
+        const minutes = Math.floor((remaining % 3600000) / 60000);
+        return interaction.reply({
+          content: `⏳ You already claimed your daily! Try again in ${hours}h ${minutes}m.`,
+          ephemeral: true,
+        });
+      }
+
+      db.addBalance(userId, DAILY_AMOUNT);
+      db.setLastDaily(userId, now);
+
+      const newBalance = db.getBalance(userId);
+
+      const embed = new EmbedBuilder()
+        .setColor('Purple')
+        .setTitle('🎉 Daily Reward Claimed!')
+        .setDescription(`You received **${currency}${DAILY_AMOUNT}** as your daily reward.\nNew Balance: **${currency}${newBalance}**`)
+        .setTimestamp()
+        .setThumbnail(interaction.user.displayAvatarURL({ extension: 'png', size: 512 }));
+
+      return interaction.reply({ embeds: [embed] });
     }
   }
 };
