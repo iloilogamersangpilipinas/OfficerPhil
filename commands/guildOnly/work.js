@@ -1,11 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
-
-const BIN_ID = process.env.JSONBIN_BIN_ID;
-const API_KEY = process.env.JSONBIN_API_KEY;
-
+const db = require('../../db'); // adjust path to your db.js
 const workCooldowns = new Map();
 const COOLDOWN_SECONDS = 300; // 5 minutes cooldown
+const currency = 'SR £';
 
 const workPrompts = [
   'You participated in a community service.',
@@ -50,7 +47,6 @@ const noMoneyPrompts = [
 function getRandomReward() {
   const jackpotChance = 1 / 1000;
   const bigPayoutChance = 1 / 8;
-
   const roll = Math.random();
 
   if (roll < jackpotChance) {
@@ -58,30 +54,8 @@ function getRandomReward() {
   } else if (roll < bigPayoutChance + jackpotChance) {
     return { amount: 1000, label: '💰 Big payout!' };
   } else {
-    const normalAmount = Math.floor(Math.random() * 151) + 50; // 50-200
+    const normalAmount = Math.floor(Math.random() * 151) + 50; // 50–200
     return { amount: normalAmount, label: '' };
-  }
-}
-
-async function loadBalances() {
-  try {
-    const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': API_KEY }
-    });
-    return res.data.record || {};
-  } catch (err) {
-    console.error('Failed to load balances:', err);
-    return {};
-  }
-}
-
-async function saveBalances(balances) {
-  try {
-    await axios.put(`https://api.jsonbin.io/v3/b/${BIN_ID}`, balances, {
-      headers: { 'X-Master-Key': API_KEY, 'Content-Type': 'application/json' }
-    });
-  } catch (err) {
-    console.error('Failed to save balances:', err);
   }
 }
 
@@ -102,7 +76,6 @@ module.exports = {
       }
     }
 
-    // 70% chance to earn money
     const earnMoneyChance = 0.7;
     const earnedMoney = Math.random() < earnMoneyChance;
 
@@ -112,24 +85,22 @@ module.exports = {
       const rewardData = getRandomReward();
       const prompt = workPrompts[Math.floor(Math.random() * workPrompts.length)];
 
-      const balances = await loadBalances();
-      if (!balances[userId]) balances[userId] = 0;
-      balances[userId] += rewardData.amount;
-      await saveBalances(balances);
+      // Load current balance and add reward
+      let currentBalance = db.getBalance(userId);
+      db.setBalance(userId, currentBalance + rewardData.amount);
 
       embed = new EmbedBuilder()
         .setColor('#014aad')
         .setTitle('💼 Work Completed')
-        .setDescription(`${prompt}\nYou earned **SR £${rewardData.amount}** ${rewardData.label}`)
+        .setDescription(`${prompt}\nYou earned **${currency}${rewardData.amount}** ${rewardData.label}`)
         .setTimestamp();
-
     } else {
       const prompt = noMoneyPrompts[Math.floor(Math.random() * noMoneyPrompts.length)];
 
       embed = new EmbedBuilder()
         .setColor('#ff0000')
         .setTitle('💼 Work Result')
-        .setDescription(`${prompt}\nYou earned **SR £0**.`)
+        .setDescription(`${prompt}\nYou earned **${currency}0**.`)
         .setTimestamp();
     }
 
