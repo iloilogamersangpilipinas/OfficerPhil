@@ -5,25 +5,25 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
 
 const gameCache = new Map();
 const gameCooldowns = new Map();
-const COOLDOWN_TIME = 60000; // 1 minute cooldown for game ID
+const COOLDOWN_TIME = 60000; // 1 minute cooldown per universe ID
 
 const userCooldowns = new Map();
 const USER_COOLDOWN_TIME = 60000; // 1 minute cooldown per Discord user
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('gameinfo')
-    .setDescription('Get info about a Roblox game')
+    .setName('robloxgameinfo')
+    .setDescription('Get info about a Roblox game by keyword')
     .addStringOption(option =>
-      option.setName('gameid')
-        .setDescription('Roblox Universe ID (game ID)')
+      option.setName('keyword')
+        .setDescription('Search keyword or game name')
         .setRequired(true)
     ),
   async execute(interaction) {
     const discordUserId = interaction.user.id;
     const now = Date.now();
 
-    // Discord user cooldown check
+    // User cooldown check
     if (userCooldowns.has(discordUserId)) {
       const lastUsed = userCooldowns.get(discordUserId);
       if (now - lastUsed < USER_COOLDOWN_TIME) {
@@ -36,32 +36,48 @@ module.exports = {
     }
     userCooldowns.set(discordUserId, now);
 
-    const gameId = interaction.options.getString('gameid');
+    const keyword = interaction.options.getString('keyword');
     await interaction.deferReply();
 
-    // Game cooldown check
-    const cooldownTimestamp = gameCooldowns.get(gameId);
+    // Search games by keyword
+    let searchResults;
+    try {
+      const searchRes = await axios.get(`https://search.roblox.com/catalog/json?Category=1&SortType=Relevance&Keyword=${encodeURIComponent(keyword)}`);
+      searchResults = searchRes.data;
+    } catch (err) {
+      console.error('Game search error:', err);
+      return interaction.editReply('Error searching for games. Try again later.');
+    }
+
+    if (!searchResults.length) {
+      return interaction.editReply(`No games found matching "${keyword}".`);
+    }
+
+    const universeId = searchResults[0].UniverseId || searchResults[0].universeId;
+    if (!universeId) {
+      return interaction.editReply('Could not find a valid Universe ID for the top result.');
+    }
+
+    // Game cooldown check by universeId
+    const cooldownTimestamp = gameCooldowns.get(universeId);
     if (cooldownTimestamp && (now - cooldownTimestamp < COOLDOWN_TIME)) {
       const remainingUnix = Math.floor((cooldownTimestamp + COOLDOWN_TIME) / 1000);
-      return interaction.editReply(`Please wait until <t:${remainingUnix}:R> before using this command again.`);
+      return interaction.editReply(`Please wait until <t:${remainingUnix}:R> before requesting info for "${keyword}" again.`);
     }
 
     try {
-      const game = await fetchRobloxGame(gameId);
+      const game = await fetchRobloxGame(universeId);
       if (!game || !game.name) {
-        return interaction.editReply(`Game with ID "${gameId}" not found.`);
+        return interaction.editReply(`Game info for "${keyword}" could not be retrieved.`);
       }
 
       const createdDate = new Date(game.created);
       const yearPublished = isNaN(createdDate.getTime()) ? 'Unknown' : createdDate.getFullYear().toString();
-      const thumbnailUrl = await fetchGameThumbnail(gameId);
+      const thumbnailUrl = await fetchGameThumbnail(universeId);
 
       const embed = new EmbedBuilder()
         .setColor('#014aad')
-        .setAuthor({
-          name: `Game Info: ${game.name}`,
-          iconURL: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Roblox_Logo_2022.png'
-        })
+        .setTitle(`<:roblox:1397454614520926350> Game Info: ${game.name}`)
         .setDescription(game.description || '*No description provided.*')
         .addFields(
           { name: 'Published Year', value: yearPublished, inline: true },
@@ -72,6 +88,9 @@ module.exports = {
         .setFooter({ text: 'Data provided by Roblox API' })
         .setTimestamp();
 
+      gameCooldowns.set(universeId, now);
+      gameCache.set(universeId, game);
+
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error(err);
@@ -80,17 +99,15 @@ module.exports = {
   }
 };
 
-async function fetchRobloxGame(gameId) {
+async function fetchRobloxGame(universeId) {
   const now = Date.now();
   const maxRetries = 3;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await axios.get(`https://games.roblox.com/v1/games?universeIds=${gameId}`);
+      const res = await axios.get(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
       const game = res.data?.data?.[0];
 
-      gameCooldowns.set(gameId, now);
-      gameCache.set(gameId, game || null);
       return game || null;
     } catch (err) {
       if (err.response?.status === 429) await delay(1000 * (attempt + 1));
@@ -101,14 +118,12 @@ async function fetchRobloxGame(gameId) {
     }
   }
 
-  gameCooldowns.set(gameId, now);
-  gameCache.set(gameId, null);
   return null;
 }
 
-async function fetchGameThumbnail(gameId) {
+async function fetchGameThumbnail(universeId) {
   try {
-    const res = await axios.get(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${gameId}&size=512x512&format=Png&isCircular=false`);
+    const res = await axios.get(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&size=512x512&format=Png&isCircular=false`);
     return res.data?.data?.[0]?.imageUrl || '';
   } catch (err) {
     console.error('Thumbnail fetch error:', err);

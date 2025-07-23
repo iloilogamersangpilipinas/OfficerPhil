@@ -12,7 +12,7 @@ const USER_COOLDOWN_TIME = 60; // seconds
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('robloxinfo')
+    .setName('robloxuserinfo')
     .setDescription('Get Roblox user info')
     .addStringOption(option =>
       option.setName('username')
@@ -28,8 +28,9 @@ module.exports = {
     const userLastUsed = userCooldowns.get(discordUserId);
     if (userLastUsed && now - userLastUsed < USER_COOLDOWN_TIME) {
       const remaining = USER_COOLDOWN_TIME - (now - userLastUsed);
+      const cooldownEnds = userLastUsed + USER_COOLDOWN_TIME;
       return interaction.reply({
-        content: `⏳ Please wait ${remaining}s before using this command again. Last used <t:${userLastUsed}:R>.`,
+        content: `⏳ Please wait ${remaining}s before using this command again. Cooldown ends <t:${cooldownEnds}:R>.`,
         ephemeral: true
       });
     }
@@ -42,7 +43,8 @@ module.exports = {
     const lastRobloxUsed = robloxCooldowns.get(username);
     if (lastRobloxUsed && now - lastRobloxUsed < COOLDOWN_TIME) {
       const remaining = COOLDOWN_TIME - (now - lastRobloxUsed);
-      return interaction.editReply(`⏳ Info for "${username}" was recently fetched <t:${lastRobloxUsed}:R>. Please wait ${remaining}s.`);
+      const cooldownEnds = lastRobloxUsed + COOLDOWN_TIME;
+      return interaction.editReply(`⏳ Info for "${username}" was recently fetched. Cooldown ends <t:${cooldownEnds}:R>. Please wait ${remaining}s.`);
     }
 
     // 🛰 Fetch data
