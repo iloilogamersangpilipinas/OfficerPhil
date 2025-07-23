@@ -15,14 +15,14 @@ module.exports = {
     const text = interaction.options.getString('text');
 
     try {
-      const res = await fetch('https://translate.argosopentech.com/translate', {
+      const res = await fetch('https://libretranslate.de/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           q: text,
           source: 'auto',
           target: 'fr',
-          format: 'text'
+          format: 'text',
         }),
       });
 
@@ -32,9 +32,8 @@ module.exports = {
 
       const responseMessage = `${text} in French 🇫🇷 is *"${data.translatedText}"*`;
       await interaction.reply({ content: responseMessage });
-
-    } catch (err) {
-      console.error('Translation Error:', err);
+    } catch (error) {
+      console.error('Translation Error:', error);
       await interaction.reply({
         content: "Whoops, I can't translate that right now. Please try again later.",
         ephemeral: true,
