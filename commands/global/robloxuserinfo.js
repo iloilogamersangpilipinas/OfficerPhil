@@ -62,7 +62,10 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor('#014aad')
-        .setTitle(`Roblox User Info: ${user.name}`)
+        .setAuthor({
+          name: `Roblox User Info: ${user.name}`,
+          iconURL: 'https://i.imgur.com/Y5egr1d.png', // Roblox logo with transparent background
+        })
         .setThumbnail(avatarUrl)
         .addFields(
           { name: 'Username', value: user.name, inline: false },
