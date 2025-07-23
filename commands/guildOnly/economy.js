@@ -1,30 +1,16 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const axios = require('axios');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
-const BIN_ID = process.env.JSONBIN_BIN_ID;
-const API_KEY = process.env.JSONBIN_API_KEY;
+const dataPath = path.join(__dirname, '..', 'balances.json');
 
-const headers = {
-  'Content-Type': 'application/json',
-  'X-Master-Key': API_KEY
-};
-
-async function loadBalances() {
-  try {
-    const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers });
-    return res.data.record || {};
-  } catch (err) {
-    console.error('Failed to load balances:', err.response?.data || err.message);
-    return {};
-  }
+function loadBalances() {
+  if (!fs.existsSync(dataPath)) return {};
+  return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 }
 
-async function saveBalances(balances) {
-  try {
-    await axios.put(`https://api.jsonbin.io/v3/b/${BIN_ID}`, balances, { headers });
-  } catch (err) {
-    console.error('Failed to save balances:', err.response?.data || err.message);
-  }
+function saveBalances(balances) {
+  fs.writeFileSync(dataPath, JSON.stringify(balances, null, 2));
 }
 
 module.exports = {
@@ -32,7 +18,9 @@ module.exports = {
     .setName('economy')
     .setDescription('Economy commands')
     .addSubcommand(subcommand =>
-      subcommand.setName('leaderboard').setDescription('Show top richest users'))
+      subcommand
+        .setName('leaderboard')
+        .setDescription('Show top richest users'))
     .addSubcommand(subcommand =>
       subcommand
         .setName('balance')
@@ -55,71 +43,18 @@ module.exports = {
         .addIntegerOption(option => option.setName('amount').setDescription('Amount to remove').setRequired(true)))
     .addSubcommand(subcommand =>
       subcommand
-        .setName('reset')
-        .setDescription('Reset all economy balances (admin only)')),
+        .setName('giveall')
+        .setDescription('Add money to all users (Admin only)')
+        .addIntegerOption(option => 
+          option.setName('amount')
+            .setDescription('Amount to add to every user')
+            .setRequired(true)
+        )
+    ),
 
   async execute(interaction) {
     const currency = 'SR £';
-
-    if (interaction.options.getSubcommand() === 'reset') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
-
-      // Send confirmation buttons
-      const row = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId('confirm_reset_yes')
-            .setLabel('Yes')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId('confirm_reset_no')
-            .setLabel('No')
-            .setStyle(ButtonStyle.Danger)
-        );
-
-      await interaction.reply({ content: '⚠️ Are you sure you want to reset the entire economy? This action cannot be undone.', components: [row], ephemeral: true });
-
-      const filter = i => i.user.id === interaction.user.id;
-      const collector = interaction.channel.createMessageComponentCollector({ filter, componentType: ComponentType.Button, time: 15000 });
-
-      collector.on('collect', async i => {
-        if (i.customId === 'confirm_reset_yes') {
-          collector.stop('confirmed');
-
-          await saveBalances({});
-
-          await i.update({ content: `✅ The Republic of Supreme Rendezvous' Economy has been reset by **${interaction.user.tag}**.`, components: [] });
-
-          // DM audit log to you (user ID: 1002294482600984598)
-          const auditUserId = '1002294482600984598';
-          try {
-            const auditUser = await interaction.client.users.fetch(auditUserId);
-            if (auditUser) {
-              await auditUser.send(`⚠️ Economy reset by **${interaction.user.tag}** (${interaction.user.id})`);
-            }
-          } catch (error) {
-            console.error('Failed to send audit DM:', error);
-          }
-
-        } else if (i.customId === 'confirm_reset_no') {
-          collector.stop('cancelled');
-          await i.update({ content: '❌ Economy reset cancelled.', components: [] });
-        }
-      });
-
-      collector.on('end', (collected, reason) => {
-        if (reason !== 'confirmed' && reason !== 'cancelled') {
-          interaction.editReply({ content: '⌛ Economy reset timed out.', components: [] });
-        }
-      });
-
-      return; // stop further execution
-    }
-
-    // For all other commands, load balances
-    const balances = await loadBalances();
+    const balances = loadBalances();
 
     if (interaction.options.getSubcommand() === 'leaderboard') {
       const sorted = Object.entries(balances)
@@ -155,10 +90,41 @@ module.exports = {
       const user = interaction.options.getUser('user') || interaction.user;
       const balance = balances[user.id] || 0;
 
+      // Quotes based on balance tiers
+      const quotesRich = [
+        "You're rolling in SR £!",
+        "The Republic's elite!",
+        "Wealth suits you well!",
+        "You're rich!",
+        "Keep shining like gold!"
+      ];
+      const quotesMid = [
+        "You're mid, steady and strong.",
+        "A balanced life, a balanced wallet.",
+        "Keep grinding, you're getting there!",
+        "Not poor, not rich, just you.",
+        "Mid-tier and moving up!"
+      ];
+      const quotesPoor = [
+        "Better days ahead!",
+        "You're poor, but rich in spirit.",
+        "Keep hustling, you'll get there!",
+        "Low balance, high hopes.",
+        "Money isn't everything!"
+      ];
+
+      let quoteSet;
+      if (balance >= 10000) quoteSet = quotesRich;
+      else if (balance >= 1000) quoteSet = quotesMid;
+      else quoteSet = quotesPoor;
+
+      const quote = quoteSet[Math.floor(Math.random() * quoteSet.length)];
+
       const embed = new EmbedBuilder()
         .setColor('Blue')
         .setTitle('🏦 Account Balance')
         .setDescription(`**${user.tag}** has a balance of **${currency}${balance}**`)
+        .setFooter({ text: quote })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
@@ -175,8 +141,7 @@ module.exports = {
 
       if (!balances[user.id]) balances[user.id] = 0;
       balances[user.id] += amount;
-
-      await saveBalances(balances);
+      saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Green')
@@ -200,13 +165,38 @@ module.exports = {
 
       balances[user.id] -= amount;
       if (balances[user.id] < 0) balances[user.id] = 0;
-
-      await saveBalances(balances);
+      saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('🧾 Money Removed')
         .setDescription(`Removed **${currency}${amount}** from **${user.tag}**.\nNew Balance: **${currency}${balances[user.id]}**`)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed] });
+
+    } else if (interaction.options.getSubcommand() === 'giveall') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      }
+
+      const amount = interaction.options.getInteger('amount');
+      if (amount <= 0) {
+        return interaction.reply({ content: 'Amount must be greater than zero.', ephemeral: true });
+      }
+
+      for (const userId in balances) {
+        if (Object.hasOwnProperty.call(balances, userId)) {
+          balances[userId] += amount;
+        }
+      }
+
+      saveBalances(balances);
+
+      const embed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('💰 Economy Update')
+        .setDescription(`Added **${currency}${amount}** to **all users** in the economy.`)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
