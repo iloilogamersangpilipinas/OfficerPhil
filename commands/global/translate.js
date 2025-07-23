@@ -26,12 +26,19 @@ module.exports = {
         }),
       });
 
+      if (!res.ok) {
+        throw new Error(`API responded with status ${res.status}`);
+      }
+
       const data = await res.json();
 
-      if (!data.translatedText) throw new Error('No translation received');
+      if (!data.translatedText) {
+        throw new Error('No translation received from API.');
+      }
 
       const responseMessage = `${text} in French 🇫🇷 is *"${data.translatedText}"*`;
       await interaction.reply({ content: responseMessage });
+
     } catch (error) {
       console.error('Translation Error:', error);
       await interaction.reply({
