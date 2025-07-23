@@ -81,6 +81,8 @@ module.exports = {
         return price.toLocaleString() + ' R$';
       }
 
+      const cooldownEnds = now + COOLDOWN_TIME;
+
       // Build and send embed
       const embed = new EmbedBuilder()
         .setAuthor({ 
@@ -93,7 +95,7 @@ module.exports = {
           { name: '**Badges**', value: `${username1}: ${badges1}\n${username2}: ${badges2}`, inline: true },
           { name: '**Avatar Price**', value: `${username1}: ${formatRobux(price1)}\n${username2}: ${formatRobux(price2)}`, inline: true },
         )
-        .setFooter({ text: `Cooldown: 60 seconds | Timestamp: ${now}` })
+        .setFooter({ text: `Cooldown ends <t:${cooldownEnds}:R>` })
         .setTimestamp();
 
       return interaction.editReply({ embeds: [embed] });
