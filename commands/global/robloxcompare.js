@@ -1,10 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 
-const robloxCache = new Map(); // Cache user data by username
-const robloxCooldowns = new Map(); // Cooldown per username for API fetch (seconds)
-const userCooldowns = new Map(); // Cooldown per Discord user (seconds)
-
+const robloxCache = new Map();
+const robloxCooldowns = new Map();
+const userCooldowns = new Map();
 const COOLDOWN_TIME = 60; // seconds
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -16,7 +15,7 @@ function isValidRobloxUsername(name) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('robloxcompare')
-    .setDescription('Compare two Roblox users')
+    .setDescription('Compare two Roblox users (Groups, Badges, Avatar Price)')
     .addStringOption(option =>
       option.setName('user1')
         .setDescription('First Roblox username')
@@ -42,7 +41,7 @@ module.exports = {
     }
     userCooldowns.set(discordUserId, now);
 
-    // Get, trim, and validate usernames
+    // Get and validate usernames
     let username1 = interaction.options.getString('user1').trim();
     let username2 = interaction.options.getString('user2').trim();
 
@@ -53,9 +52,7 @@ module.exports = {
     await interaction.deferReply();
 
     try {
-      console.log('Fetching users:', username1, username2);
-
-      // Fetch data for both users concurrently
+      // Fetch both users' basic info
       const [user1, user2] = await Promise.all([
         fetchRobloxUserWithCooldown(username1, now),
         fetchRobloxUserWithCooldown(username2, now)
@@ -64,15 +61,12 @@ module.exports = {
       if (!user1) return interaction.editReply(`❌ User "${username1}" not found.`);
       if (!user2) return interaction.editReply(`❌ User "${username2}" not found.`);
 
-      // Fetch other data concurrently
+      // Fetch only groups, badges, avatar price concurrently
       const [
-        games1, games2,
         groups1, groups2,
         badges1, badges2,
         price1, price2
       ] = await Promise.all([
-        getGamesCreated(user1.id),
-        getGamesCreated(user2.id),
         getGroupsCount(user1.id),
         getGroupsCount(user2.id),
         getBadgesCount(user1.id),
@@ -81,11 +75,6 @@ module.exports = {
         getAvatarPrice(user2.id),
       ]);
 
-      // Format helpers
-      function formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toDateString();
-      }
       function formatRobux(price) {
         return price.toLocaleString() + ' R$';
       }
@@ -97,8 +86,6 @@ module.exports = {
         })
         .setColor('#FF0000')
         .addFields(
-          { name: '**Account Age**', value: `${username1}: ${formatDate(user1.created)}\n${username2}: ${formatDate(user2.created)}`, inline: false },
-          { name: '**Games Created**', value: `${username1}: ${games1}\n${username2}: ${games2}`, inline: true },
           { name: '**Groups**', value: `${username1}: ${groups1}\n${username2}: ${groups2}`, inline: true },
           { name: '**Badges**', value: `${username1}: ${badges1}\n${username2}: ${badges2}`, inline: true },
           { name: '**Avatar Price**', value: `${username1}: ${formatRobux(price1)}\n${username2}: ${formatRobux(price2)}`, inline: true },
@@ -115,23 +102,22 @@ module.exports = {
   }
 };
 
-// Fetch user with cooldown & cache, with retry on 429
 async function fetchRobloxUserWithCooldown(username, now) {
   const lastUsed = robloxCooldowns.get(username);
   if (lastUsed && now - lastUsed < COOLDOWN_TIME && robloxCache.has(username)) {
-    return robloxCache.get(username); // Return cached data
+    return robloxCache.get(username);
   }
 
   const maxRetries = 3;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`Fetching Roblox user "${username}", attempt ${attempt+1}`);
-      const searchRes = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=1`);
+      const searchRes = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
       if (!searchRes.data.data.length) {
         robloxCooldowns.set(username, now);
         robloxCache.set(username, null);
         return null;
       }
+
       const userBasic = searchRes.data.data[0];
       const userDetailsRes = await axios.get(`https://users.roblox.com/v1/users/${userBasic.id}`);
 
@@ -141,7 +127,10 @@ async function fetchRobloxUserWithCooldown(username, now) {
 
     } catch (err) {
       if (err.response?.status === 429) {
-        await delay(1000 * (attempt + 1)); // backoff
+        await delay(1000 * (attempt + 1));
+      } else if (err.response?.status === 400) {
+        console.warn(`Roblox API returned 400 Bad Request for username "${username}". Treating as not found.`);
+        break;
       } else {
         console.error(`Error fetching user "${username}":`, err.message);
         break;
@@ -152,16 +141,6 @@ async function fetchRobloxUserWithCooldown(username, now) {
   robloxCooldowns.set(username, now);
   robloxCache.set(username, null);
   return null;
-}
-
-// Helpers for other data fetching (no retries for brevity)
-async function getGamesCreated(userId) {
-  try {
-    const res = await axios.get(`https://apis.roblox.com/universes/v1/users/${userId}/universes`);
-    return res.data.data?.length || 0;
-  } catch {
-    return 0;
-  }
 }
 
 async function getGroupsCount(userId) {
