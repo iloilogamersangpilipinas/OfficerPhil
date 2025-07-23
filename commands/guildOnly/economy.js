@@ -1,16 +1,61 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
-const dataPath = path.join(__dirname, '..', 'balances.json');
+const BIN_ID = process.env.JSONBIN_ID;
+const MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
+const currency = 'SR £';
 
-function loadBalances() {
-  if (!fs.existsSync(dataPath)) return {};
-  return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+async function loadBalances() {
+  try {
+    const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': MASTER_KEY }
+    });
+    return res.data.record || {};
+  } catch (err) {
+    console.error('Error loading balances from JSONBin:', err);
+    return {};
+  }
 }
 
-function saveBalances(balances) {
-  fs.writeFileSync(dataPath, JSON.stringify(balances, null, 2));
+async function saveBalances(balances) {
+  try {
+    await axios.put(`https://api.jsonbin.io/v3/b/${BIN_ID}`, balances, {
+      headers: { 'X-Master-Key': MASTER_KEY }
+    });
+  } catch (err) {
+    console.error('Error saving balances to JSONBin:', err);
+  }
+}
+
+function getBalanceFootnote(balance) {
+  if (balance >= 100000) {
+    const quotes = [
+      "You're rich! Keep shining! 💎",
+      "Living large in the Republic! 🤑",
+      "High roller vibes! 🎉",
+      "Your wallet thanks you! 💰",
+      "You're top-tier wealthy! 🏆"
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  } else if (balance >= 10000) {
+    const quotes = [
+      "You're doing well, keep going! 💪",
+      "Mid-level mogul! 📈",
+      "Nice stash you've got! 🙂",
+      "Steady and strong! 🚀",
+      "On your way up! 🌟"
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  } else {
+    const quotes = [
+      "You're poor, but hopeful! 🤞",
+      "Every empire starts small! 🐣",
+      "Keep grinding! 💼",
+      "Saving for a rainy day! ☔",
+      "Rome wasn't built in a day! 🏛️"
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  }
 }
 
 module.exports = {
@@ -45,7 +90,7 @@ module.exports = {
       subcommand
         .setName('giveall')
         .setDescription('Add money to all users (Admin only)')
-        .addIntegerOption(option => 
+        .addIntegerOption(option =>
           option.setName('amount')
             .setDescription('Amount to add to every user')
             .setRequired(true)
@@ -53,10 +98,11 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const currency = 'SR £';
-    const balances = loadBalances();
+    const balances = await loadBalances();
 
-    if (interaction.options.getSubcommand() === 'leaderboard') {
+    const subcommand = interaction.options.getSubcommand();
+
+    if (subcommand === 'leaderboard') {
       const sorted = Object.entries(balances)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 10);
@@ -86,50 +132,22 @@ module.exports = {
 
       await interaction.reply({ embeds: [embed] });
 
-    } else if (interaction.options.getSubcommand() === 'balance') {
+    } else if (subcommand === 'balance') {
       const user = interaction.options.getUser('user') || interaction.user;
       const balance = balances[user.id] || 0;
 
-      // Quotes based on balance tiers
-      const quotesRich = [
-        "You're rolling in SR £!",
-        "The Republic's elite!",
-        "Wealth suits you well!",
-        "You're rich!",
-        "Keep shining like gold!"
-      ];
-      const quotesMid = [
-        "You're mid, steady and strong.",
-        "A balanced life, a balanced wallet.",
-        "Keep grinding, you're getting there!",
-        "Not poor, not rich, just you.",
-        "Mid-tier and moving up!"
-      ];
-      const quotesPoor = [
-        "Better days ahead!",
-        "You're poor, but rich in spirit.",
-        "Keep hustling, you'll get there!",
-        "Low balance, high hopes.",
-        "Money isn't everything!"
-      ];
-
-      let quoteSet;
-      if (balance >= 10000) quoteSet = quotesRich;
-      else if (balance >= 1000) quoteSet = quotesMid;
-      else quoteSet = quotesPoor;
-
-      const quote = quoteSet[Math.floor(Math.random() * quoteSet.length)];
+      const footnote = getBalanceFootnote(balance);
 
       const embed = new EmbedBuilder()
         .setColor('Blue')
         .setTitle('🏦 Account Balance')
         .setDescription(`**${user.tag}** has a balance of **${currency}${balance}**`)
-        .setFooter({ text: quote })
+        .setFooter({ text: footnote })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
 
-    } else if (interaction.options.getSubcommand() === 'add-money') {
+    } else if (subcommand === 'add-money') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
       }
@@ -141,7 +159,7 @@ module.exports = {
 
       if (!balances[user.id]) balances[user.id] = 0;
       balances[user.id] += amount;
-      saveBalances(balances);
+      await saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Green')
@@ -151,7 +169,7 @@ module.exports = {
 
       await interaction.reply({ embeds: [embed] });
 
-    } else if (interaction.options.getSubcommand() === 'remove-money') {
+    } else if (subcommand === 'remove-money') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
       }
@@ -165,7 +183,7 @@ module.exports = {
 
       balances[user.id] -= amount;
       if (balances[user.id] < 0) balances[user.id] = 0;
-      saveBalances(balances);
+      await saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Red')
@@ -175,7 +193,7 @@ module.exports = {
 
       await interaction.reply({ embeds: [embed] });
 
-    } else if (interaction.options.getSubcommand() === 'giveall') {
+    } else if (subcommand === 'giveall') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
       }
@@ -185,13 +203,14 @@ module.exports = {
         return interaction.reply({ content: 'Amount must be greater than zero.', ephemeral: true });
       }
 
+      // Add amount to every user in balances
       for (const userId in balances) {
         if (Object.hasOwnProperty.call(balances, userId)) {
           balances[userId] += amount;
         }
       }
 
-      saveBalances(balances);
+      await saveBalances(balances);
 
       const embed = new EmbedBuilder()
         .setColor('Green')
