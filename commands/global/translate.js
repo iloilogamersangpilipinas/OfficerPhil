@@ -8,13 +8,14 @@ module.exports = {
     .addStringOption(option =>
       option.setName('text')
         .setDescription('The text to translate')
-        .setRequired(true)),
+        .setRequired(true)
+    ),
 
   async execute(interaction) {
     const text = interaction.options.getString('text');
 
     try {
-      const res = await fetch('https://libretranslate.de/translate', {
+      const res = await fetch('https://translate.argosopentech.com/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -35,7 +36,7 @@ module.exports = {
     } catch (err) {
       console.error('Translation Error:', err);
       await interaction.reply({
-        content: "Whoops, I can't translate that. Please try again later.",
+        content: "Whoops, I can't translate that right now. Please try again later.",
         ephemeral: true,
       });
     }
