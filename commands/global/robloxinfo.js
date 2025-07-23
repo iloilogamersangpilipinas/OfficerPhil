@@ -2,9 +2,13 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
+
 const robloxCache = new Map();
 const robloxCooldowns = new Map();
-const COOLDOWN_TIME = 60000;
+const COOLDOWN_TIME = 60000; // 1 minute cooldown for Roblox username
+
+const userCooldowns = new Map();
+const USER_COOLDOWN_TIME = 60000; // 1 minute cooldown per Discord user
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,12 +20,62 @@ module.exports = {
         .setRequired(true)
     ),
   async execute(interaction) {
+    const discordUserId = interaction.user.id;
+    const now = Date.now();
+
+    // Discord user cooldown check
+    if (userCooldowns.has(discordUserId)) {
+      const lastUsed = userCooldowns.get(discordUserId);
+      if (now - lastUsed < USER_COOLDOWN_TIME) {
+        const remaining = ((USER_COOLDOWN_TIME - (now - lastUsed)) / 1000).toFixed(1);
+        return interaction.reply({ content: `Please wait ${remaining} seconds before using this command again.`, ephemeral: true });
+      }
+    }
+    userCooldowns.set(discordUserId, now);
+
     const username = interaction.options.getString('username');
     await interaction.deferReply();
 
+    // Roblox username cooldown & cache check
+    const cooldownTimestamp = robloxCooldowns.get(username);
+    const cachedUser = robloxCache.get(username);
+
+    if (cooldownTimestamp && (now - cooldownTimestamp < COOLDOWN_TIME)) {
+      if (cachedUser === null) {
+        // Previously not found, send cooldown message
+        const remaining = ((COOLDOWN_TIME - (now - cooldownTimestamp)) / 1000).toFixed(1);
+        return interaction.editReply(`User "${username}" is not found. Wait for the cooldown to finish: ${remaining} seconds.`);
+      }
+      // If cachedUser is valid, we can just use that to respond without fetching again
+      const user = cachedUser;
+      const createdDate = new Date(user.created);
+      if (isNaN(createdDate.getTime())) return interaction.editReply('Invalid account creation date.');
+
+      const diffYears = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(2);
+      const thumbResp = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png&isCircular=false`);
+      const avatarUrl = thumbResp.data?.data?.[0]?.imageUrl || '';
+
+      const embed = new EmbedBuilder()
+        .setColor('#014aad')
+        .setTitle(`Roblox User Info: ${user.name}`)
+        .setThumbnail(avatarUrl)
+        .addFields(
+          { name: 'Username', value: user.name, inline: false },
+          { name: 'User ID', value: user.id.toString(), inline: true },
+          { name: 'Account Age', value: `${diffYears} years`, inline: true }
+        )
+        .setFooter({ text: 'Data provided by Roblox API' })
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+    // If no cooldown or expired, fetch fresh data
     try {
       const user = await fetchRobloxUser(username);
-      if (!user || !user.created) return interaction.editReply(`User "${username}" not found.`);
+      if (!user || !user.created) {
+        return interaction.editReply(`User "${username}" not found.`);
+      }
 
       const createdDate = new Date(user.created);
       if (isNaN(createdDate.getTime())) return interaction.editReply('Invalid account creation date.');
@@ -52,6 +106,7 @@ module.exports = {
 
 async function fetchRobloxUser(username) {
   const now = Date.now();
+
   if (robloxCooldowns.has(username)) {
     if (now - robloxCooldowns.get(username) < COOLDOWN_TIME) {
       return robloxCache.get(username) || null;
@@ -59,9 +114,6 @@ async function fetchRobloxUser(username) {
   }
 
   robloxCooldowns.set(username, now);
-  if (robloxCache.has(username)) {
-    return robloxCache.get(username);
-  }
 
   const maxRetries = 3;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
