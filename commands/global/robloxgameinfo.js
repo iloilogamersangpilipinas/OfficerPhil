@@ -3,12 +3,13 @@ const axios = require('axios');
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
-const gameCache = new Map();
-const gameCooldowns = new Map();
-const COOLDOWN_TIME = 60000; // 1 minute cooldown per universe ID
+// Cooldown time in milliseconds
+const COOLDOWN_TIME_MS = 60000; // 1 minute per universe ID
+const USER_COOLDOWN_TIME_MS = 60000; // 1 minute per user
 
-const userCooldowns = new Map();
-const USER_COOLDOWN_TIME = 60000; // 1 minute cooldown per Discord user
+// Store cooldown timestamps in Unix seconds for Discord timestamps
+const gameCooldowns = new Map(); // universeId -> timestamp in seconds
+const userCooldowns = new Map(); // discordUserId -> timestamp in seconds
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,22 +20,23 @@ module.exports = {
         .setDescription('Search keyword or game name')
         .setRequired(true)
     ),
+
   async execute(interaction) {
     const discordUserId = interaction.user.id;
-    const now = Date.now();
+    const nowMs = Date.now();
+    const nowSec = Math.floor(nowMs / 1000);
 
     // User cooldown check
-    if (userCooldowns.has(discordUserId)) {
-      const lastUsed = userCooldowns.get(discordUserId);
-      if (now - lastUsed < USER_COOLDOWN_TIME) {
-        const remainingUnix = Math.floor((lastUsed + USER_COOLDOWN_TIME) / 1000);
-        return interaction.reply({
-          content: `Please wait until <t:${remainingUnix}:R> before using this command again.`,
-          ephemeral: true
-        });
-      }
+    const userLastUsed = userCooldowns.get(discordUserId);
+    if (userLastUsed && nowMs - userLastUsed * 1000 < USER_COOLDOWN_TIME_MS) {
+      const cooldownEnds = userLastUsed + USER_COOLDOWN_TIME_MS / 1000;
+      const remaining = cooldownEnds - nowSec;
+      return interaction.reply({
+        content: `Please wait ${remaining}s before using this command again. Cooldown ends <t:${cooldownEnds}:R>.`,
+        ephemeral: true
+      });
     }
-    userCooldowns.set(discordUserId, now);
+    userCooldowns.set(discordUserId, nowSec);
 
     const keyword = interaction.options.getString('keyword');
     await interaction.deferReply();
@@ -59,10 +61,11 @@ module.exports = {
     }
 
     // Game cooldown check by universeId
-    const cooldownTimestamp = gameCooldowns.get(universeId);
-    if (cooldownTimestamp && (now - cooldownTimestamp < COOLDOWN_TIME)) {
-      const remainingUnix = Math.floor((cooldownTimestamp + COOLDOWN_TIME) / 1000);
-      return interaction.editReply(`Please wait until <t:${remainingUnix}:R> before requesting info for "${keyword}" again.`);
+    const gameLastUsed = gameCooldowns.get(universeId);
+    if (gameLastUsed && nowMs - gameLastUsed * 1000 < COOLDOWN_TIME_MS) {
+      const cooldownEnds = gameLastUsed + COOLDOWN_TIME_MS / 1000;
+      const remaining = cooldownEnds - nowSec;
+      return interaction.editReply(`Please wait ${remaining}s before requesting info for "${keyword}" again. Cooldown ends <t:${cooldownEnds}:R>.`);
     }
 
     try {
@@ -77,7 +80,10 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor('#014aad')
-        .setTitle(`<:roblox:1397454614520926350> Game Info: ${game.name}`)
+        .setAuthor({
+          name: `Game Info: ${game.name}`,
+          iconURL: 'https://i.imgur.com/Y5egr1d.png'
+        })
         .setDescription(game.description || '*No description provided.*')
         .addFields(
           { name: 'Published Year', value: yearPublished, inline: true },
@@ -88,8 +94,7 @@ module.exports = {
         .setFooter({ text: 'Data provided by Roblox API' })
         .setTimestamp();
 
-      gameCooldowns.set(universeId, now);
-      gameCache.set(universeId, game);
+      gameCooldowns.set(universeId, nowSec);
 
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
@@ -100,14 +105,12 @@ module.exports = {
 };
 
 async function fetchRobloxGame(universeId) {
-  const now = Date.now();
   const maxRetries = 3;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const res = await axios.get(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
       const game = res.data?.data?.[0];
-
       return game || null;
     } catch (err) {
       if (err.response?.status === 429) await delay(1000 * (attempt + 1));
@@ -117,7 +120,6 @@ async function fetchRobloxGame(universeId) {
       }
     }
   }
-
   return null;
 }
 
