@@ -9,6 +9,10 @@ const COOLDOWN_TIME = 60; // seconds
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+function isValidRobloxUsername(name) {
+  return /^[a-zA-Z0-9_]{3,20}$/.test(name);
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('robloxcompare')
@@ -38,20 +42,27 @@ module.exports = {
     }
     userCooldowns.set(discordUserId, now);
 
-    const username1 = interaction.options.getString('user1');
-    const username2 = interaction.options.getString('user2');
+    // Get, trim, and validate usernames
+    let username1 = interaction.options.getString('user1').trim();
+    let username2 = interaction.options.getString('user2').trim();
+
+    if (!isValidRobloxUsername(username1) || !isValidRobloxUsername(username2)) {
+      return interaction.reply({ content: '❌ One or both usernames are invalid Roblox usernames. Usernames must be 3-20 characters long and contain only letters, numbers, or underscores.', ephemeral: true });
+    }
 
     await interaction.deferReply();
 
     try {
+      console.log('Fetching users:', username1, username2);
+
       // Fetch data for both users concurrently
       const [user1, user2] = await Promise.all([
         fetchRobloxUserWithCooldown(username1, now),
         fetchRobloxUserWithCooldown(username2, now)
       ]);
 
-      if (!user1) return interaction.editReply(`User "${username1}" not found.`);
-      if (!user2) return interaction.editReply(`User "${username2}" not found.`);
+      if (!user1) return interaction.editReply(`❌ User "${username1}" not found.`);
+      if (!user2) return interaction.editReply(`❌ User "${username2}" not found.`);
 
       // Fetch other data concurrently
       const [
@@ -114,6 +125,7 @@ async function fetchRobloxUserWithCooldown(username, now) {
   const maxRetries = 3;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      console.log(`Fetching Roblox user "${username}", attempt ${attempt+1}`);
       const searchRes = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=1`);
       if (!searchRes.data.data.length) {
         robloxCooldowns.set(username, now);
