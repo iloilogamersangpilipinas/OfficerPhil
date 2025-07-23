@@ -5,10 +5,10 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
 
 const robloxCache = new Map();
 const robloxCooldowns = new Map();
-const COOLDOWN_TIME = 60000; // 1 minute cooldown for Roblox username
+const COOLDOWN_TIME = 60; // seconds
 
 const userCooldowns = new Map();
-const USER_COOLDOWN_TIME = 60000; // 1 minute cooldown per Discord user
+const USER_COOLDOWN_TIME = 60; // seconds
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,41 +19,42 @@ module.exports = {
         .setDescription('Roblox username')
         .setRequired(true)
     ),
+
   async execute(interaction) {
     const discordUserId = interaction.user.id;
-    const now = Date.now();
+    const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
 
-    // Discord user cooldown check
-    if (userCooldowns.has(discordUserId)) {
-      const lastUsed = userCooldowns.get(discordUserId);
-      if (now - lastUsed < USER_COOLDOWN_TIME) {
-        const remaining = ((USER_COOLDOWN_TIME - (now - lastUsed)) / 1000).toFixed(1);
-        return interaction.reply({ content: `Please wait ${remaining} seconds before using this command again.`, ephemeral: true });
-      }
+    // 🔒 User cooldown check
+    const userLastUsed = userCooldowns.get(discordUserId);
+    if (userLastUsed && now - userLastUsed < USER_COOLDOWN_TIME) {
+      const remaining = USER_COOLDOWN_TIME - (now - userLastUsed);
+      return interaction.reply({
+        content: `⏳ Please wait ${remaining}s before using this command again. Last used <t:${userLastUsed}:R>.`,
+        ephemeral: true
+      });
     }
     userCooldowns.set(discordUserId, now);
 
     const username = interaction.options.getString('username');
     await interaction.deferReply();
 
-    // Immediate Roblox username cooldown check
-    const cooldownTimestamp = robloxCooldowns.get(username);
-    if (cooldownTimestamp && (now - cooldownTimestamp < COOLDOWN_TIME)) {
-      const remaining = ((COOLDOWN_TIME - (now - cooldownTimestamp)) / 1000).toFixed(1);
-      return interaction.editReply(`Please wait ${remaining} seconds before requesting info for "${username}" again.`);
+    // 🔒 Roblox username cooldown check
+    const lastRobloxUsed = robloxCooldowns.get(username);
+    if (lastRobloxUsed && now - lastRobloxUsed < COOLDOWN_TIME) {
+      const remaining = COOLDOWN_TIME - (now - lastRobloxUsed);
+      return interaction.editReply(`⏳ Info for "${username}" was recently fetched <t:${lastRobloxUsed}:R>. Please wait ${remaining}s.`);
     }
 
-    // If no cooldown, fetch fresh data
+    // 🛰 Fetch data
     try {
-      const user = await fetchRobloxUser(username);
+      const user = await fetchRobloxUser(username, now);
       if (!user || !user.created) {
         return interaction.editReply(`User "${username}" not found.`);
       }
 
       const createdDate = new Date(user.created);
-      if (isNaN(createdDate.getTime())) return interaction.editReply('Invalid account creation date.');
-
       const diffYears = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(2);
+
       const thumbResp = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png&isCircular=false`);
       const avatarUrl = thumbResp.data?.data?.[0]?.imageUrl || '';
 
@@ -72,16 +73,14 @@ module.exports = {
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error(err);
-      await interaction.editReply('Error fetching Roblox info. Try again later.');
+      await interaction.editReply('❌ Error fetching Roblox info. Try again later.');
     }
   }
 };
 
-async function fetchRobloxUser(username) {
-  const now = Date.now();
-
-  // Update cooldown timestamp and cache only after fetching fresh data
+async function fetchRobloxUser(username, now) {
   const maxRetries = 3;
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const searchRes = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${username}`);
@@ -90,11 +89,14 @@ async function fetchRobloxUser(username) {
         robloxCache.set(username, null);
         return null;
       }
+
       const userBasic = searchRes.data.data[0];
       const userDetailsRes = await axios.get(`https://users.roblox.com/v1/users/${userBasic.id}`);
+
       robloxCooldowns.set(username, now);
       robloxCache.set(username, userDetailsRes.data);
       return userDetailsRes.data;
+
     } catch (err) {
       if (err.response?.status === 429) await delay(1000 * (attempt + 1));
       else {
@@ -103,6 +105,7 @@ async function fetchRobloxUser(username) {
       }
     }
   }
+
   robloxCooldowns.set(username, now);
   robloxCache.set(username, null);
   return null;
