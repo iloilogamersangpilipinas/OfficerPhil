@@ -15,12 +15,12 @@ module.exports = {
     const text = interaction.options.getString('text');
 
     try {
-      const res = await fetch('https://libretranslate.com/translate', {
+      const res = await fetch('https://libretranslate.de/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           q: text,
-          source: 'auto',
+          source: 'en',   // <-- explicitly set English here
           target: 'fr',
           format: 'text',
         }),
