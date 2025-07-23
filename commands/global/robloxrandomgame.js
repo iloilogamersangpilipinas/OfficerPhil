@@ -1,8 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 
-const delay = ms => new Promise(res => setTimeout(res, ms));
-
 // Cooldown in milliseconds
 const COOLDOWN_TIME_MS = 60000; // 1 min per universeId
 const USER_COOLDOWN_TIME_MS = 60000; // 1 min per user
@@ -11,15 +9,24 @@ const USER_COOLDOWN_TIME_MS = 60000; // 1 min per user
 const gameCooldowns = new Map(); // universeId -> timestamp in seconds
 const userCooldowns = new Map(); // discordUserId -> timestamp in seconds
 
+// List of handpicked game universeIds (these are popular public games)
+const universeIds = [
+  292439477,   // Apocalypse Rising
+  2788229376,  // Blox Fruits
+  920587237,   // Adopt Me
+  537413528,   // Arsenal
+  10275074885, // Pet Simulator X
+  155615604,   // Prison Life
+  3260590327,  // Doors
+  4483381587,  // Brookhaven
+  6678870192,  // BedWars
+  843468296    // Royale High
+];
+
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('robloxgameinfo')
-    .setDescription('Get info about a Roblox game by keyword')
-    .addStringOption(option =>
-      option.setName('keyword')
-        .setDescription('Search keyword or game name')
-        .setRequired(true)
-    ),
+    .setName('robloxrandomgame')
+    .setDescription('Show a random popular Roblox game.'),
 
   async execute(interaction) {
     const discordUserId = interaction.user.id;
@@ -38,49 +45,29 @@ module.exports = {
     }
     userCooldowns.set(discordUserId, nowSec);
 
-    const keyword = interaction.options.getString('keyword');
     await interaction.deferReply();
 
-    // Search games by keyword using new games list endpoint
-    let searchResults;
-    try {
-      const searchRes = await axios.get(`https://games.roblox.com/v1/games/list`, {
-        params: {
-          searchTerm: keyword,
-          limit: 10,
-          sortOrder: "Asc"
-        }
-      });
-      searchResults = searchRes.data?.data || [];
-    } catch (err) {
-      console.error('Game search error:', err);
-      return interaction.editReply('❌ Error searching for games. Try again later.');
-    }
+    // Pick a random universe ID
+    const universeId = universeIds[Math.floor(Math.random() * universeIds.length)];
 
-    if (!searchResults.length) {
-      return interaction.editReply(`❌ No games found matching "${keyword}".`);
-    }
-
-    const game = searchResults[0];
-    const universeId = game.universeId;
-    if (!universeId) {
-      return interaction.editReply('❌ Could not find a valid Universe ID for the top result.');
-    }
-
-    // Game cooldown check by universeId
+    // Game cooldown check
     const gameLastUsed = gameCooldowns.get(universeId);
     if (gameLastUsed && nowMs - gameLastUsed * 1000 < COOLDOWN_TIME_MS) {
       const cooldownEnds = gameLastUsed + COOLDOWN_TIME_MS / 1000;
       const remaining = cooldownEnds - nowSec;
-      return interaction.editReply(`⏳ Please wait ${remaining}s before requesting info for "${keyword}" again. Cooldown ends <t:${cooldownEnds}:R>.`);
+      return interaction.editReply(`⏳ This random game was shown recently. Try again in ${remaining}s. Cooldown ends <t:${cooldownEnds}:R>.`);
     }
 
     try {
-      // Fetch detailed game info by universeId (some fields might be redundant but we keep consistency)
+      // Get game details
       const detailedRes = await axios.get(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
-      const detailedGame = detailedRes.data?.data?.[0] || game;
+      const detailedGame = detailedRes.data?.data?.[0];
 
-      // Thumbnail (game icon)
+      if (!detailedGame) {
+        return interaction.editReply('❌ Failed to fetch game details.');
+      }
+
+      // Get game thumbnail
       const thumbRes = await axios.get(`https://thumbnails.roblox.com/v1/games/icons`, {
         params: {
           universeIds: universeId,
@@ -99,7 +86,7 @@ module.exports = {
         .setColor('#014aad')
         .setAuthor({
           name: `Game Info: ${detailedGame.name}`,
-          iconURL: 'https://i.imgur.com/Y5egr1d.png', // Roblox transparent logo from Imgur
+          iconURL: 'https://i.imgur.com/Y5egr1d.png',
           url: `https://www.roblox.com/games/${detailedGame.rootPlaceId || universeId}`
         })
         .setDescription(detailedGame.description || '*No description provided.*')
@@ -113,11 +100,10 @@ module.exports = {
         .setTimestamp();
 
       gameCooldowns.set(universeId, nowSec);
-
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
-      console.error('Error fetching detailed game info:', err);
-      await interaction.editReply('❌ Error fetching game info. Try again later.');
+      console.error('Error fetching random game:', err);
+      await interaction.editReply('❌ Error fetching game data. Try again later.');
     }
   }
 };
