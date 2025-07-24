@@ -136,14 +136,18 @@ module.exports = {
       db.removeItem(userId, item.name);
       db.addItem(recipient.id, item.name);
 
-      return interaction.reply({
+      await recipient.send({
         embeds: [
           new EmbedBuilder()
             .setTitle(`🎁 ${username} has a gift for you!`)
             .setDescription(`It's a... ||${item.name}|| 🥳🎉\n*They gifted you something from the shop!*`)
             .setColor('Fuchsia')
-        ],
-        content: `<@${recipient.id}>`,
+        ]
+      });
+
+      return interaction.reply({
+        embeds: [new EmbedBuilder().setDescription(`You gifted **${item.name}** to ${recipient.username}.`).setColor('Fuchsia')],
+        ephemeral: true
       });
     }
 
