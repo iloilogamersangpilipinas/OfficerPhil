@@ -3,9 +3,7 @@ const path = require('path');
 
 const db = new Database(path.join(__dirname, 'economy.db'));
 
-// ─── Tables ──────────────────────────────────────────
-
-// User balances
+// Create balances table
 db.prepare(`
   CREATE TABLE IF NOT EXISTS balances (
     userId TEXT PRIMARY KEY,
@@ -13,7 +11,7 @@ db.prepare(`
   )
 `).run();
 
-// Daily claims
+// Create daily claims table
 db.prepare(`
   CREATE TABLE IF NOT EXISTS daily_claims (
     userId TEXT PRIMARY KEY,
@@ -21,29 +19,18 @@ db.prepare(`
   )
 `).run();
 
-// Inventory with quantity
+// Create inventory table (tracks how many of each item a user has)
 db.prepare(`
   CREATE TABLE IF NOT EXISTS inventory (
     userId TEXT,
     item TEXT,
-    quantity INTEGER DEFAULT 1,
+    quantity INTEGER NOT NULL,
     PRIMARY KEY (userId, item)
   )
 `).run();
 
-// Shop item metadata
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS shop_items (
-    item TEXT PRIMARY KEY,
-    description TEXT,
-    price INTEGER
-  )
-`).run();
-
-// ─── Exported Functions ────────────────────────────────
-
 module.exports = {
-  // ── Balances ──
+  // BALANCE FUNCTIONS
   getBalance(userId) {
     const row = db.prepare('SELECT balance FROM balances WHERE userId = ?').get(userId);
     return row ? row.balance : 0;
@@ -51,7 +38,7 @@ module.exports = {
 
   setBalance(userId, amount) {
     db.prepare(`
-      INSERT INTO balances (userId, balance)
+      INSERT INTO balances (userId, balance) 
       VALUES (?, ?)
       ON CONFLICT(userId) DO UPDATE SET balance = excluded.balance
     `).run(userId, amount);
@@ -66,7 +53,7 @@ module.exports = {
     return db.prepare('SELECT * FROM balances').all();
   },
 
-  // ── Daily ──
+  // DAILY CLAIM FUNCTIONS
   getLastDaily(userId) {
     const row = db.prepare('SELECT lastClaim FROM daily_claims WHERE userId = ?').get(userId);
     return row ? row.lastClaim : 0;
@@ -80,55 +67,39 @@ module.exports = {
     `).run(userId, timestamp);
   },
 
-  // ── Inventory ──
+  // INVENTORY FUNCTIONS
+
+  // Add a quantity of an item to a user's inventory
   addItem(userId, item, quantity = 1) {
-    const existing = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    if (existing) {
+    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    if (row) {
       db.prepare('UPDATE inventory SET quantity = quantity + ? WHERE userId = ? AND item = ?').run(quantity, userId, item);
     } else {
       db.prepare('INSERT INTO inventory (userId, item, quantity) VALUES (?, ?, ?)').run(userId, item, quantity);
     }
   },
 
-  removeItem(userId, item, quantity = 1) {
-    const existing = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    if (!existing) return;
-
-    if (existing.quantity > quantity) {
-      db.prepare('UPDATE inventory SET quantity = quantity - ? WHERE userId = ? AND item = ?').run(quantity, userId, item);
-    } else {
-      db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
-    }
-  },
-
-  hasItem(userId, item, quantity = 1) {
+  // Check if user has at least one of the specified item
+  hasItem(userId, item) {
     const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    return row && row.quantity >= quantity;
+    return row && row.quantity > 0;
   },
 
+  // Remove quantity of an item from user inventory, remove row if quantity falls to zero or below
+  removeItem(userId, item, quantity = 1) {
+    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    if (!row || row.quantity < quantity) return false; // not enough items
+
+    if (row.quantity === quantity) {
+      db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
+    } else {
+      db.prepare('UPDATE inventory SET quantity = quantity - ? WHERE userId = ? AND item = ?').run(quantity, userId, item);
+    }
+    return true;
+  },
+
+  // Get a user's full inventory as an array of {item, quantity}
   getInventory(userId) {
     return db.prepare('SELECT item, quantity FROM inventory WHERE userId = ?').all(userId);
-  },
-
-  getItemQuantity(userId, item) {
-    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    return row ? row.quantity : 0;
-  },
-
-  // ── Shop Items (Metadata) ──
-  addShopItem(item, description, price) {
-    db.prepare(`
-      INSERT INTO shop_items (item, description, price)
-      VALUES (?, ?, ?)
-      ON CONFLICT(item) DO UPDATE SET description = excluded.description, price = excluded.price
-    `).run(item, description, price);
-  },
-
-  getShopItem(item) {
-    return db.prepare('SELECT * FROM shop_items WHERE item = ?').get(item);
-  },
-
-  getAllShopItems() {
-    return db.prepare('SELECT * FROM shop_items').all();
   }
 };
