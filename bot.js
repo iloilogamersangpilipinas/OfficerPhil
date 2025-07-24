@@ -36,24 +36,30 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
+      console.log(`Command received: ${interaction.commandName}`);
       const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-
+      if (!command) {
+        console.log('No matching command found.');
+        return;
+      }
       await command.execute(interaction);
     } else if (interaction.isStringSelectMenu()) {
-      // Handle dropdown interaction for /shop use submenu
+      console.log(`SelectMenu interaction with customId: ${interaction.customId}`);
       if (interaction.customId === 'use_item_select') {
-        const selectedItem = interaction.values[0];  // value = lowercase item name from dropdown
+        const selectedItem = interaction.values[0];
+        console.log(`Selected item: ${selectedItem}`);
         const shopCommand = client.commands.get('shop');
 
-        if (!shopCommand || typeof shopCommand.useItem !== 'function') {
+        if (!shopCommand) {
+          console.log('Shop command not found in collection.');
+          return interaction.reply({ content: 'Shop command not found.', ephemeral: true });
+        }
+        if (typeof shopCommand.useItem !== 'function') {
+          console.log('useItem function not found on shop command.');
           return interaction.reply({ content: 'Shop command or useItem handler not found.', ephemeral: true });
         }
 
-        // Call the useItem helper function exported by shop.js
         const response = await shopCommand.useItem(interaction.user.id, selectedItem, interaction);
-
-        // Send the resulting embed as a reply
         return interaction.update({ embeds: [response.embed], components: [], content: null });
       }
     }
