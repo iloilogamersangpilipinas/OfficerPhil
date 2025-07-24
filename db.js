@@ -19,16 +19,17 @@ db.prepare(`
   )
 `).run();
 
-// Create inventory table
+// Create inventory table with quantity column
 db.prepare(`
   CREATE TABLE IF NOT EXISTS inventory (
     userId TEXT,
     item TEXT,
+    quantity INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (userId, item)
   )
 `).run();
 
-// Create item usage table for tracking limited uses (fishing rod, bible, etc)
+// Create item usage table for limited uses (fishing rod, bible, etc)
 db.prepare(`
   CREATE TABLE IF NOT EXISTS item_usage (
     userId TEXT,
@@ -76,27 +77,40 @@ module.exports = {
     `).run(userId, timestamp);
   },
 
-  // Inventory functions
+  // Inventory functions supporting quantity
   addItem(userId, item) {
-    db.prepare(`
-      INSERT INTO inventory (userId, item)
-      VALUES (?, ?)
-      ON CONFLICT(userId, item) DO NOTHING
-    `).run(userId, item);
+    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    if (row) {
+      db.prepare('UPDATE inventory SET quantity = quantity + 1 WHERE userId = ? AND item = ?').run(userId, item);
+    } else {
+      db.prepare('INSERT INTO inventory (userId, item, quantity) VALUES (?, ?, 1)').run(userId, item);
+    }
   },
 
   hasItem(userId, item) {
-    const row = db.prepare('SELECT 1 FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    return !!row;
+    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    return row && row.quantity > 0;
   },
 
   removeItem(userId, item) {
-    db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
+    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    if (!row) return;
+    if (row.quantity > 1) {
+      db.prepare('UPDATE inventory SET quantity = quantity - 1 WHERE userId = ? AND item = ?').run(userId, item);
+    } else {
+      db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
+    }
   },
 
   getInventory(userId) {
-    const rows = db.prepare('SELECT item FROM inventory WHERE userId = ?').all(userId);
-    return rows.map(r => r.item);
+    const rows = db.prepare('SELECT item, quantity FROM inventory WHERE userId = ?').all(userId);
+    const items = [];
+    for (const row of rows) {
+      for (let i = 0; i < row.quantity; i++) {
+        items.push(row.item);
+      }
+    }
+    return items;
   },
 
   // Item usage tracking for limited-use items
