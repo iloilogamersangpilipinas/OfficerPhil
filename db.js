@@ -19,18 +19,27 @@ db.prepare(`
   )
 `).run();
 
-// Create inventory table (tracks how many of each item a user has)
+// Create inventory table
 db.prepare(`
   CREATE TABLE IF NOT EXISTS inventory (
     userId TEXT,
     item TEXT,
-    quantity INTEGER NOT NULL,
+    PRIMARY KEY (userId, item)
+  )
+`).run();
+
+// Create item usage table for tracking limited uses (fishing rod, bible, etc)
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS item_usage (
+    userId TEXT,
+    item TEXT,
+    usesLeft INTEGER,
     PRIMARY KEY (userId, item)
   )
 `).run();
 
 module.exports = {
-  // BALANCE FUNCTIONS
+  // Balance functions
   getBalance(userId) {
     const row = db.prepare('SELECT balance FROM balances WHERE userId = ?').get(userId);
     return row ? row.balance : 0;
@@ -53,7 +62,7 @@ module.exports = {
     return db.prepare('SELECT * FROM balances').all();
   },
 
-  // DAILY CLAIM FUNCTIONS
+  // Daily claim functions
   getLastDaily(userId) {
     const row = db.prepare('SELECT lastClaim FROM daily_claims WHERE userId = ?').get(userId);
     return row ? row.lastClaim : 0;
@@ -67,39 +76,57 @@ module.exports = {
     `).run(userId, timestamp);
   },
 
-  // INVENTORY FUNCTIONS
-
-  // Add a quantity of an item to a user's inventory
-  addItem(userId, item, quantity = 1) {
-    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    if (row) {
-      db.prepare('UPDATE inventory SET quantity = quantity + ? WHERE userId = ? AND item = ?').run(quantity, userId, item);
-    } else {
-      db.prepare('INSERT INTO inventory (userId, item, quantity) VALUES (?, ?, ?)').run(userId, item, quantity);
-    }
+  // Inventory functions
+  addItem(userId, item) {
+    db.prepare(`
+      INSERT INTO inventory (userId, item)
+      VALUES (?, ?)
+      ON CONFLICT(userId, item) DO NOTHING
+    `).run(userId, item);
   },
 
-  // Check if user has at least one of the specified item
   hasItem(userId, item) {
-    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    return row && row.quantity > 0;
+    const row = db.prepare('SELECT 1 FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
+    return !!row;
   },
 
-  // Remove quantity of an item from user inventory, remove row if quantity falls to zero or below
-  removeItem(userId, item, quantity = 1) {
-    const row = db.prepare('SELECT quantity FROM inventory WHERE userId = ? AND item = ?').get(userId, item);
-    if (!row || row.quantity < quantity) return false; // not enough items
-
-    if (row.quantity === quantity) {
-      db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
-    } else {
-      db.prepare('UPDATE inventory SET quantity = quantity - ? WHERE userId = ? AND item = ?').run(quantity, userId, item);
-    }
-    return true;
+  removeItem(userId, item) {
+    db.prepare('DELETE FROM inventory WHERE userId = ? AND item = ?').run(userId, item);
   },
 
-  // Get a user's full inventory as an array of {item, quantity}
   getInventory(userId) {
-    return db.prepare('SELECT item, quantity FROM inventory WHERE userId = ?').all(userId);
+    const rows = db.prepare('SELECT item FROM inventory WHERE userId = ?').all(userId);
+    return rows.map(r => r.item);
+  },
+
+  // Item usage tracking for limited-use items
+  getUsesLeft(userId, item) {
+    const row = db.prepare('SELECT usesLeft FROM item_usage WHERE userId = ? AND item = ?').get(userId, item);
+    return row ? row.usesLeft : null;
+  },
+
+  setUsesLeft(userId, item, usesLeft) {
+    if (usesLeft <= 0) {
+      // Remove usage record when no uses left
+      db.prepare('DELETE FROM item_usage WHERE userId = ? AND item = ?').run(userId, item);
+    } else {
+      db.prepare(`
+        INSERT INTO item_usage (userId, item, usesLeft)
+        VALUES (?, ?, ?)
+        ON CONFLICT(userId, item) DO UPDATE SET usesLeft = excluded.usesLeft
+      `).run(userId, item, usesLeft);
+    }
+  },
+
+  decrementUse(userId, item) {
+    const usesLeft = module.exports.getUsesLeft(userId, item);
+    if (usesLeft === null) return; // no usage tracking for this item
+    if (usesLeft > 1) {
+      module.exports.setUsesLeft(userId, item, usesLeft - 1);
+    } else {
+      // Remove the item and usage tracking when uses run out
+      module.exports.removeItem(userId, item);
+      module.exports.setUsesLeft(userId, item, 0);
+    }
   }
 };
