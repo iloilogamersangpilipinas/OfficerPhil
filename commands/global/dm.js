@@ -18,7 +18,7 @@ module.exports = {
     const message = interaction.options.getString('message');
 
     try {
-      await targetUser.send(`📩 **DM from ${interaction.user.tag}:** ${message}`);
+      await targetUser.send(`{message}`);
       await interaction.reply({ content: `✅ Message sent to ${targetUser.tag}`, ephemeral: true });
     } catch (error) {
       console.error(error);
