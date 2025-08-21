@@ -18,12 +18,20 @@ module.exports = {
     const message = interaction.options.getString('message');
 
     try {
-      // Send DM without sender info
+      // Attempt to send DM
       await targetUser.send(`${message}`);
-      await interaction.reply({ content: `✅ Message sent to ${targetUser.tag}`, ephemeral: true });
+      // Confirmation visible only to the command executor
+      await interaction.reply({ 
+        content: `✅ Message successfully sent to <@${targetUser.id}>`, 
+        ephemeral: true 
+      });
     } catch (error) {
-      console.error(error);
-      await interaction.reply({ content: '❌ Could not send the DM.', ephemeral: true });
+      console.error(`Failed to DM ${targetUser.tag}:`, error);
+      // Handle users who cannot receive DMs
+      await interaction.reply({ 
+        content: `❌ Could not send the DM to <@${targetUser.id}>. They may have DMs disabled.`, 
+        ephemeral: true 
+      });
     }
   },
 };
