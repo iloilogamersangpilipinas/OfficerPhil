@@ -121,44 +121,22 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async interaction => {
-  if (interaction.isChatInputCommand()) {
-    const command = client.commands.get(interaction.commandName);
-    if (!command) {
-      console.log(`No command matching ${interaction.commandName} found`);
-      return;
-    }
+  if (!interaction.isChatInputCommand()) return;
 
-    try {
-      await command.execute(interaction);
-      console.log(`Executed command: ${interaction.commandName}`);
-    } catch (error) {
-      console.error('Error executing command:', error);
-      await interaction.reply({ content: 'Error executing command.', ephemeral: true });
-    }
-  } else if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === 'rps_select') {
-      const userChoice = interaction.values[0]; // rock, paper, scissors
-      const choices = ['rock', 'paper', 'scissors'];
-      const botChoice = choices[Math.floor(Math.random() * choices.length)];
+  console.log(`Interaction received: ${interaction.commandName}`);
 
-      let result;
-      if (userChoice === botChoice) {
-        result = "It's a tie!";
-      } else if (
-        (userChoice === 'rock' && botChoice === 'scissors') ||
-        (userChoice === 'paper' && botChoice === 'rock') ||
-        (userChoice === 'scissors' && botChoice === 'paper')
-      ) {
-        result = "You win! 🎉";
-      } else {
-        result = "You lose! 😢";
-      }
+  const command = client.commands.get(interaction.commandName);
+  if (!command) {
+    console.log(`No command matching ${interaction.commandName} found`);
+    return;
+  }
 
-      await interaction.update({
-        content: `You chose **${userChoice}**. I chose **${botChoice}**. ${result}`,
-        components: [], // remove select menu after choice
-      });
-    }
+  try {
+    await command.execute(interaction);
+    console.log(`Executed command: ${interaction.commandName}`);
+  } catch (error) {
+    console.error('Error executing command:', error);
+    await interaction.reply({ content: 'Error executing command.', ephemeral: true });
   }
 });
 

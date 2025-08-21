@@ -1,57 +1,37 @@
 const { REST, Routes } = require('discord.js');
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID; // Your bot's client ID
-const GUILD_ID = process.env.GUILD_ID;   // Your guild ID
+const CLIENT_ID = '1396760691003752562'; // Replace with your bot's application client ID
+const GUILD_ID = '1152050425986551888';   // Replace with your Discord server (guild) ID
+
+const commands = [
+  {
+    name: 'robloxinfo',
+    description: 'Get Roblox user info',
+    options: [
+      {
+        name: 'username',
+        type: 3, // STRING type
+        description: 'Roblox username',
+        required: true,
+      },
+    ],
+  },
+];
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
 
-// Load guild-only commands
-const guildCommandsPath = path.join(__dirname, 'commands', 'guildOnly');
-const guildCommandFiles = fs.existsSync(guildCommandsPath)
-  ? fs.readdirSync(guildCommandsPath).filter(file => file.endsWith('.js'))
-  : [];
-const guildCommands = guildCommandFiles.map(file => {
-  const command = require(path.join(guildCommandsPath, file));
-  return command.data.toJSON();
-});
-
-// Load global commands
-const globalCommandsPath = path.join(__dirname, 'commands', 'global');
-const globalCommandFiles = fs.existsSync(globalCommandsPath)
-  ? fs.readdirSync(globalCommandsPath).filter(file => file.endsWith('.js'))
-  : [];
-const globalCommands = globalCommandFiles.map(file => {
-  const command = require(path.join(globalCommandsPath, file));
-  return command.data.toJSON();
-});
-
 (async () => {
   try {
-    console.log('Refreshing application (/) commands...');
+    console.log('Started refreshing application (/) commands.');
 
-    // Register guild-only commands for your guild
-    if (guildCommands.length > 0) {
-      await rest.put(
-        Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-        { body: guildCommands }
-      );
-      console.log(`Registered ${guildCommands.length} guild-only commands.`);
-    }
+    await rest.put(
+      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      { body: commands },
+    );
 
-    // Register global commands
-    if (globalCommands.length > 0) {
-      await rest.put(
-        Routes.applicationCommands(CLIENT_ID),
-        { body: globalCommands }
-      );
-      console.log(`Registered ${globalCommands.length} global commands.`);
-    }
-
-    console.log('All commands reloaded successfully.');
+    console.log('Successfully reloaded application (/) commands.');
   } catch (error) {
     console.error(error);
   }
