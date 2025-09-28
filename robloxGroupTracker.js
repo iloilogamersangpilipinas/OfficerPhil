@@ -13,16 +13,18 @@ const normalize = str => (str || '').trim().toLowerCase();
 
 // Fetch Roblox group members safely
 async function getGroupMembers() {
-  const res = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users`);
+  const res = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users?limit=100`);
   const data = await res.json();
 
-  if (!data.data) return [];
+  if (!data.data || data.data.length === 0) return [];
 
+  // Map properly using .user and .role
   return data.data
     .map(member => {
-      const userId = member.userId ?? member.id;
-      const username = member.username ?? member.name;
+      const userId = member.user?.id;
+      const username = member.user?.username;
       const role = member.role?.name ?? 'Unknown';
+
       if (!userId || !username) return null; // skip invalid entries
       return { userId, username, role };
     })
@@ -44,14 +46,14 @@ async function checkForGroupUpdates(client) {
   const channel = client.channels.cache.get(CHANNEL_ID);
   if (!channel) return;
 
-  // Initialize members.json if empty (no spamming for current members)
+  // Initialize members.json if empty (skip sending embeds)
   if (Object.keys(oldMembers).length === 0) {
     newMembers.forEach(member => {
       oldMembers[member.userId] = { ...member, joinedAt: Math.floor(Date.now() / 1000) };
     });
     fs.writeFileSync(MEMBER_FILE, JSON.stringify(oldMembers, null, 2));
     console.log("✅ Initialized members.json with current Roblox group members.");
-    return; // skip sending embeds for already existing members
+    return;
   }
 
   for (const member of newMembers) {
@@ -117,9 +119,11 @@ async function checkForGroupUpdates(client) {
 
 // Export a function to start the tracker
 module.exports = (client) => {
-  // Run immediately
-  checkForGroupUpdates(client);
+  client.once('ready', () => {
+    // Run immediately
+    checkForGroupUpdates(client);
 
-  // Schedule every 5 minutes
-  setInterval(() => checkForGroupUpdates(client), 5 * 60 * 1000);
+    // Schedule every 5 minutes
+    setInterval(() => checkForGroupUpdates(client), 5 * 60 * 1000);
+  });
 };
