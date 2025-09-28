@@ -41,10 +41,11 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `New Roblox Member Joined: ${member.username}`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields(
-          { name: 'Username', value: member.username, inline: true },
-          { name: 'Role', value: member.role, inline: true },
+          { name: 'Username', value: String(member.username || "Unknown"), inline: true },
+          { name: 'Role', value: String(member.role || "No Role"), inline: true },
           { name: 'Joined', value: `<t:${joinTimestamp}:R>`, inline: false }
         )
+
         .setFooter({ text: 'Roblox group tracking | Join time shown relative' })
         .setTimestamp();
 
@@ -60,10 +61,11 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `Roblox Role Update: ${member.username}`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields(
-          { name: 'Username', value: member.username, inline: true },
-          { name: 'Old Role', value: old.role, inline: true },
-          { name: 'New Role', value: member.role, inline: true }
+          { name: 'Username', value: String(member.username || "Unknown"), inline: true },
+          { name: 'Old Role', value: String(old.role || "Unknown"), inline: true },
+          { name: 'New Role', value: String(member.role || "Unknown"), inline: true }
         )
+
         .setFooter({ text: 'Roblox group tracking | Role update time relative' })
         .setTimestamp();
 
