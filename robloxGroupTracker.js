@@ -14,8 +14,8 @@ async function getGroupMembers() {
   const data = await res.json();
   return data.data.map(member => ({
     userId: member.userId,
-    username: member.username,
-    role: member.role.name
+    username: member.username || "Unknown",
+    role: member.role?.name || "No Role"
   }));
 }
 
@@ -28,7 +28,10 @@ async function checkForGroupUpdates(client) {
 
   const newMembers = await getGroupMembers();
   const channel = client.channels.cache.get(CHANNEL_ID);
-  if (!channel) return;
+  if (!channel) {
+    console.warn(`Channel ID ${CHANNEL_ID} not found! Make sure the bot has access.`);
+    return;
+  }
 
   for (const member of newMembers) {
     const old = oldMembers[member.userId];
@@ -41,15 +44,19 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `New Roblox Member Joined: ${member.username}`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields(
-          { name: 'Username', value: String(member.username || "Unknown"), inline: true },
-          { name: 'Role', value: String(member.role || "No Role"), inline: true },
+          { name: 'Username', value: String(member.username), inline: true },
+          { name: 'Role', value: String(member.role), inline: true },
           { name: 'Joined', value: `<t:${joinTimestamp}:R>`, inline: false }
         )
-
         .setFooter({ text: 'Roblox group tracking | Join time shown relative' })
         .setTimestamp();
 
-      channel.send({ embeds: [embed] });
+      try {
+        await channel.send({ embeds: [embed] });
+      } catch (err) {
+        console.error('Error sending new member embed:', err);
+      }
+
       oldMembers[member.userId] = { ...member, joinedAt: joinTimestamp };
       continue;
     }
@@ -61,15 +68,18 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `Roblox Role Update: ${member.username}`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields(
-          { name: 'Username', value: String(member.username || "Unknown"), inline: true },
-          { name: 'Old Role', value: String(old.role || "Unknown"), inline: true },
-          { name: 'New Role', value: String(member.role || "Unknown"), inline: true }
+          { name: 'Username', value: String(member.username), inline: true },
+          { name: 'Old Role', value: String(old.role), inline: true },
+          { name: 'New Role', value: String(member.role), inline: true }
         )
-
         .setFooter({ text: 'Roblox group tracking | Role update time relative' })
         .setTimestamp();
 
-      channel.send({ embeds: [embed] });
+      try {
+        await channel.send({ embeds: [embed] });
+      } catch (err) {
+        console.error('Error sending role update embed:', err);
+      }
     }
 
     // Update state
