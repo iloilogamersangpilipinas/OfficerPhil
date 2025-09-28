@@ -8,6 +8,9 @@ const GROUP_ID = 35590726; // Your Roblox group ID
 const CHANNEL_ID = '1245874836308361266'; // Your Discord channel ID
 const MEMBER_FILE = path.join(__dirname, 'members.json');
 
+// Helper: normalize role names to avoid false role change spam
+const normalize = str => (str || '').trim().toLowerCase();
+
 // Fetch Roblox group members
 async function getGroupMembers() {
   const res = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users`);
@@ -23,20 +26,25 @@ async function getGroupMembers() {
 async function checkForGroupUpdates(client) {
   let oldMembers = {};
   if (fs.existsSync(MEMBER_FILE)) {
-    oldMembers = JSON.parse(fs.readFileSync(MEMBER_FILE, 'utf8'));
+    try {
+      oldMembers = JSON.parse(fs.readFileSync(MEMBER_FILE, 'utf8'));
+    } catch {
+      oldMembers = {};
+    }
   }
 
   const newMembers = await getGroupMembers();
   const channel = client.channels.cache.get(CHANNEL_ID);
   if (!channel) return;
 
-  // Initialize members.json if empty
+  // Initialize members.json if empty (no spamming for current members)
   if (Object.keys(oldMembers).length === 0) {
     newMembers.forEach(member => {
       oldMembers[member.userId] = { ...member, joinedAt: Math.floor(Date.now() / 1000) };
     });
     fs.writeFileSync(MEMBER_FILE, JSON.stringify(oldMembers, null, 2));
     console.log("✅ Initialized members.json with current Roblox group members.");
+    return; // skip sending embeds for already existing members
   }
 
   for (const member of newMembers) {
@@ -51,7 +59,7 @@ async function checkForGroupUpdates(client) {
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields({
           name: 'Info',
-          value: `**Username:**\n${member.username || "Unknown"}\n\n**User ID:**\n${member.userId}\n\n**Role:**\n${member.role || "No Role"}\n\n**Joined:**\n<t:${joinTimestamp}:R>`
+          value: `**Username:** ${member.username || "Unknown"}\n**User ID:** ${member.userId}\n**Role:** ${member.role || "No Role"}\n**Joined:** <t:${joinTimestamp}:R>`
         })
         .setFooter({ text: 'Roblox group tracking | Join time shown relative' })
         .setTimestamp();
@@ -67,14 +75,14 @@ async function checkForGroupUpdates(client) {
     }
 
     // Role changed
-    if (old.role !== member.role) {
+    if (old && normalize(old.role) !== normalize(member.role)) {
       const embed = new EmbedBuilder()
         .setColor('#014aad')
         .setAuthor({ name: `Roblox Role Update`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields({
           name: 'Info',
-          value: `**Username:**\n${member.username || "Unknown"}\n\n**User ID:**\n${member.userId}\n\n**Old Role:**\n${old.role || "Unknown"}\n\n**New Role:**\n${member.role || "Unknown"}`
+          value: `**Username:** ${member.username || "Unknown"}\n**User ID:** ${member.userId}\n**Old Role:** ${old.role || "Unknown"}\n**New Role:** ${member.role || "Unknown"}`
         })
         .setFooter({ text: 'Roblox group tracking | Role update time relative' })
         .setTimestamp();
