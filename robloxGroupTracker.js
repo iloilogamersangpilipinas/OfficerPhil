@@ -11,15 +11,22 @@ const MEMBER_FILE = path.join(__dirname, 'members.json');
 // Helper: normalize role names to avoid false role change spam
 const normalize = str => (str || '').trim().toLowerCase();
 
-// Fetch Roblox group members
+// Fetch Roblox group members safely
 async function getGroupMembers() {
   const res = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users`);
   const data = await res.json();
-  return data.data.map(member => ({
-    userId: member.userId,
-    username: member.username,
-    role: member.role.name,
-  }));
+
+  if (!data.data) return [];
+
+  return data.data
+    .map(member => {
+      const userId = member.userId ?? member.id;
+      const username = member.username ?? member.name;
+      const role = member.role?.name ?? 'Unknown';
+      if (!userId || !username) return null; // skip invalid entries
+      return { userId, username, role };
+    })
+    .filter(Boolean);
 }
 
 // Main function to check for joins and role changes
@@ -58,8 +65,8 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `New Roblox Member Joined`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields({
-          name: 'Info',
-          value: `**Username:** ${member.username || "Unknown"}\n**User ID:** ${member.userId}\n**Role:** ${member.role || "No Role"}\n**Joined:** <t:${joinTimestamp}:R>`
+          name: '\u200B',
+          value: `**Username:** ${member.username}\n\n**User ID:** ${member.userId}\n\n**Role:** ${member.role}\n\n**Joined:** <t:${joinTimestamp}:R>`
         })
         .setFooter({ text: 'Roblox group tracking | Join time shown relative' })
         .setTimestamp();
@@ -81,8 +88,8 @@ async function checkForGroupUpdates(client) {
         .setAuthor({ name: `Roblox Role Update`, iconURL: 'https://i.imgur.com/Y5egr1d.png' })
         .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${member.userId}&width=420&height=420&format=png`)
         .addFields({
-          name: 'Info',
-          value: `**Username:** ${member.username || "Unknown"}\n**User ID:** ${member.userId}\n**Old Role:** ${old.role || "Unknown"}\n**New Role:** ${member.role || "Unknown"}`
+          name: '\u200B',
+          value: `**Username:** ${member.username}\n\n**User ID:** ${member.userId}\n\n**Old Role:** ${old.role}\n\n**New Role:** ${member.role}`
         })
         .setFooter({ text: 'Roblox group tracking | Role update time relative' })
         .setTimestamp();
