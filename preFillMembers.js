@@ -2,33 +2,41 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 
-const GROUP_ID = 35590726; // Your Roblox group ID
+const GROUP_ID = 35590726;
 const MEMBER_FILE = path.join(__dirname, 'members.json');
 
 async function getAllGroupMembers() {
   try {
-    const res = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users?limit=100`);
+    const url = `https://groups.roblox.com/v1/groups/${GROUP_ID}/users?limit=100`;
+    const res = await fetch(url);
     const data = await res.json();
 
     if (!data.data || data.data.length === 0) {
-      console.log('⚠️ No member data found.');
+      console.log('⚠️ No members returned by the API.');
       return [];
     }
 
-    // Map each member properly
-    return data.data
+    // Map members correctly
+    const members = data.data
       .map(member => {
-        const userId = member.user?.id;
+        const userId = member.user?.userId;
         const username = member.user?.username;
         const role = member.role?.name ?? 'Unknown';
 
-        if (!userId || !username) return null; // skip invalid entries
-        return { userId, username, role, joinedAt: Math.floor(Date.now() / 1000) };
+        if (!userId || !username) return null;
+        return {
+          userId,
+          username,
+          role,
+          joinedAt: Math.floor(Date.now() / 1000)
+        };
       })
       .filter(Boolean);
 
+    return members;
+
   } catch (err) {
-    console.error('❌ Error fetching group members:', err);
+    console.error('❌ Error fetching members:', err);
     return [];
   }
 }

@@ -1,6 +1,314 @@
 {
-  "undefined": {
+  "233187681": {
+    "userId": 233187681,
+    "username": "Philipinoboy08",
+    "role": "President | Président",
+    "joinedAt": 1759037903
+  },
+  "246402722": {
+    "userId": 246402722,
+    "username": "Ariela333",
     "role": "Citizens | Citoyens",
-    "joinedAt": 1759036321
+    "joinedAt": 1759037903
+  },
+  "332951192": {
+    "userId": 332951192,
+    "username": "Liahwz",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "428610546": {
+    "userId": 428610546,
+    "username": "Wumpus_Dev",
+    "role": "Government Officials | Fonctionnaires du Gouvernement",
+    "joinedAt": 1759037903
+  },
+  "754756248": {
+    "userId": 754756248,
+    "username": "Vlad_thelad",
+    "role": "National Police | Police Nationale",
+    "joinedAt": 1759037903
+  },
+  "952528709": {
+    "userId": 952528709,
+    "username": "sherlynmich3lle",
+    "role": "Government Officials | Fonctionnaires du Gouvernement",
+    "joinedAt": 1759037903
+  },
+  "962539063": {
+    "userId": 962539063,
+    "username": "1yn_x10",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "1208861703": {
+    "userId": 1208861703,
+    "username": "NicolasiLuka",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "1337749472": {
+    "userId": 1337749472,
+    "username": "Pandacorn2012Lo",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "1612542286": {
+    "userId": 1612542286,
+    "username": "nashauro",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "1698712673": {
+    "userId": 1698712673,
+    "username": "LaylaPlayxRoblox123x",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "1721235264": {
+    "userId": 1721235264,
+    "username": "maddithemockingjay",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "1922183451": {
+    "userId": 1922183451,
+    "username": "JsnHzl",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "1968229601": {
+    "userId": 1968229601,
+    "username": "Swords4Jsn",
+    "role": "National Police | Police Nationale",
+    "joinedAt": 1759037903
+  },
+  "2340989068": {
+    "userId": 2340989068,
+    "username": "beastyluke1489_3",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "2474741788": {
+    "userId": 2474741788,
+    "username": "xxzane_kunxx123",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "2595225005": {
+    "userId": 2595225005,
+    "username": "17Kurxxed",
+    "role": "Government Officials | Fonctionnaires du Gouvernement",
+    "joinedAt": 1759037903
+  },
+  "2601973999": {
+    "userId": 2601973999,
+    "username": "josiahking23456",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "2666846627": {
+    "userId": 2666846627,
+    "username": "MangekyoAlvinist2021",
+    "role": "Vice President | Vice-Président",
+    "joinedAt": 1759037903
+  },
+  "3036459833": {
+    "userId": 3036459833,
+    "username": "Logan124259",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3042863440": {
+    "userId": 3042863440,
+    "username": "Ciclaill",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3297610233": {
+    "userId": 3297610233,
+    "username": "AndyRogerRoger",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3431225213": {
+    "userId": 3431225213,
+    "username": "qphilcommas",
+    "role": "National Police | Police Nationale",
+    "joinedAt": 1759040275
+  },
+  "3483747739": {
+    "userId": 3483747739,
+    "username": "angelito95365t",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3666914827": {
+    "userId": 3666914827,
+    "username": "Kukymamachuky",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3854437669": {
+    "userId": 3854437669,
+    "username": "jjoyles26",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "3924723658": {
+    "userId": 3924723658,
+    "username": "borealowl2030",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "3934522324": {
+    "userId": 3934522324,
+    "username": "thatgurl_sandra12",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "7121846621": {
+    "userId": 7121846621,
+    "username": "llxhyaa",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4738989894": {
+    "userId": 4738989894,
+    "username": "DESARU_lightning",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4881066559": {
+    "userId": 4881066559,
+    "username": "Remmy_KrafftCheese",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4342687955": {
+    "userId": 4342687955,
+    "username": "kingzkiller374",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "7229817293": {
+    "userId": 7229817293,
+    "username": "tropical_bubble88",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "4674750217": {
+    "userId": 4674750217,
+    "username": "NotSpyvi",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4849054482": {
+    "userId": 4849054482,
+    "username": "o2_x1amn",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "4796733020": {
+    "userId": 4796733020,
+    "username": "Jordan23KD7",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "5387952531": {
+    "userId": 5387952531,
+    "username": "YuzoTooZesty",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4518184078": {
+    "userId": 4518184078,
+    "username": "notmaanas",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4618501219": {
+    "userId": 4618501219,
+    "username": "brandnewmantizboi274",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "6001387076": {
+    "userId": 6001387076,
+    "username": "Maxboss6ixx",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "8367468458": {
+    "userId": 8367468458,
+    "username": "Sassyniahh302t",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "5423857340": {
+    "userId": 5423857340,
+    "username": "yanyan20195",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "7139011132": {
+    "userId": 7139011132,
+    "username": "nybroski2008",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "5804527187": {
+    "userId": 5804527187,
+    "username": "yannex87",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "8116893666": {
+    "userId": 8116893666,
+    "username": "aiden10937alt",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "5347988489": {
+    "userId": 5347988489,
+    "username": "42_ty8",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "8829115528": {
+    "userId": 8829115528,
+    "username": "EZ_HOIT76",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "4372005501": {
+    "userId": 4372005501,
+    "username": "Popfart_2014",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "5037248100": {
+    "userId": 5037248100,
+    "username": "mrmarvel81",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "7194215477": {
+    "userId": 7194215477,
+    "username": "Bear555255",
+    "role": "Tourists | Touristes",
+    "joinedAt": 1759037903
+  },
+  "7415905274": {
+    "userId": 7415905274,
+    "username": "tll_875",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
+  },
+  "9155412371": {
+    "userId": 9155412371,
+    "username": "Beccaxox19",
+    "role": "Citizens | Citoyens",
+    "joinedAt": 1759037903
   }
 }
