@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const startRobloxTracker = require('./robloxGroupTracker');
 const express = require('express');
 const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
 require('dotenv').config();
@@ -118,6 +119,9 @@ client.once('ready', () => {
       giveMonthlyRewards();
     }
   }, 60 * 1000);
+
+  // 🔔 Start Roblox group tracker
+  startRobloxTracker(client);
 });
 
 client.on('interactionCreate', async interaction => {
