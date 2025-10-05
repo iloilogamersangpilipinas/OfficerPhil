@@ -1,7 +1,16 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'economy.db'));
+// Ensure the data folder exists
+const dataFolder = path.resolve(__dirname, 'data');
+if (!fs.existsSync(dataFolder)) {
+  fs.mkdirSync(dataFolder);
+}
+
+// Database file path
+const dbPath = path.join(dataFolder, 'economy.db');
+const db = new Database(dbPath);
 
 // Create tables if they don't exist
 db.prepare(`
@@ -19,6 +28,7 @@ db.prepare(`
 `).run();
 
 module.exports = {
+  // BALANCE METHODS
   getBalance(userId) {
     const row = db.prepare('SELECT balance FROM balances WHERE userId = ?').get(userId);
     return row ? row.balance : 0;
@@ -42,7 +52,6 @@ module.exports = {
   },
 
   // DAILY CLAIMS METHODS
-
   getLastDaily(userId) {
     const row = db.prepare('SELECT lastClaim FROM daily_claims WHERE userId = ?').get(userId);
     return row ? row.lastClaim : 0;

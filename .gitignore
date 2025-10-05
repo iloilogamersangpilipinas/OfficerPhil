@@ -1,6 +1,6 @@
 # Ignore environment variables file
 .env
-economy.db
+/data/
 
 # Node modules folder (don't push dependencies)
 node_modules/
