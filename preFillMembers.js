@@ -3,7 +3,13 @@ const path = require('path');
 const fetch = require('node-fetch');
 
 const GROUP_ID = 35590726;
-const MEMBER_FILE = path.join(__dirname, 'members.json');
+const DATA_FOLDER = path.join(__dirname, 'data');
+const MEMBER_FILE = path.join(DATA_FOLDER, 'members.json');
+
+// Ensure /data folder exists
+if (!fs.existsSync(DATA_FOLDER)) {
+  fs.mkdirSync(DATA_FOLDER);
+}
 
 async function getAllGroupMembers() {
   try {
@@ -24,12 +30,7 @@ async function getAllGroupMembers() {
         const role = member.role?.name ?? 'Unknown';
 
         if (!userId || !username) return null;
-        return {
-          userId,
-          username,
-          role,
-          joinedAt: Math.floor(Date.now() / 1000)
-        };
+        return { userId, username, role };
       })
       .filter(Boolean);
 
@@ -42,6 +43,16 @@ async function getAllGroupMembers() {
 }
 
 (async () => {
+  // Load existing members if the file exists
+  let existingMembers = {};
+  if (fs.existsSync(MEMBER_FILE)) {
+    try {
+      existingMembers = JSON.parse(fs.readFileSync(MEMBER_FILE, 'utf8'));
+    } catch {
+      existingMembers = {};
+    }
+  }
+
   const members = await getAllGroupMembers();
 
   if (members.length === 0) {
@@ -49,11 +60,23 @@ async function getAllGroupMembers() {
     return;
   }
 
-  const memberData = {};
+  // Merge new members without overwriting existing joinedAt
   members.forEach(member => {
-    memberData[member.userId] = member;
+    if (!existingMembers[member.userId]) {
+      // New member
+      existingMembers[member.userId] = {
+        ...member,
+        joinedAt: Math.floor(Date.now() / 1000)
+      };
+    } else {
+      // Existing member: keep their joinedAt
+      existingMembers[member.userId] = {
+        ...member,
+        joinedAt: existingMembers[member.userId].joinedAt
+      };
+    }
   });
 
-  fs.writeFileSync(MEMBER_FILE, JSON.stringify(memberData, null, 2));
-  console.log(`✅ Successfully pre-filled ${MEMBER_FILE} with ${members.length} members.`);
+  fs.writeFileSync(MEMBER_FILE, JSON.stringify(existingMembers, null, 2));
+  console.log(`✅ Successfully updated ${MEMBER_FILE} with ${members.length} members.`);
 })();
