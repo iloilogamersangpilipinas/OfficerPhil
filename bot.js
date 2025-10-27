@@ -1,23 +1,26 @@
 const fs = require('fs');
 const path = require('path');
-const startRobloxTracker = require('./robloxGroupTracker');
 const express = require('express');
 const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
 require('dotenv').config();
 
+const startRobloxTracker = require('./robloxGroupTracker');
+const db = require('./db'); // ✅ Use your SQLite system
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Discord client setup
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
-  partials: [Partials.Channel],  // For DMs if needed
+  partials: [Partials.Channel],
 });
 
-// Phil message responses
+// Fun Phil responses
 const philResponses = [
   "What's up, {user}?",
   "Whatcha want, {user}?",
@@ -26,7 +29,7 @@ const philResponses = [
   "Hello, {user}, how can I help?",
 ];
 
-// Load commands from guildOnly and global subfolders
+// Command loader
 client.commands = new Collection();
 
 const guildOnlyPath = path.join(__dirname, 'commands', 'guildOnly');
@@ -47,30 +50,25 @@ function loadCommands(dir) {
 
 loadCommands(guildOnlyPath);
 loadCommands(globalPath);
-
 console.log('Loaded commands:', [...client.commands.keys()]);
 
-// Simple web server for uptime
+// Express web server for uptime
 app.get('/', (req, res) => res.send('Bot is running'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// Economy system stuff
-const dataPath = path.join(__dirname, 'balances.json');
-const rewardInfoPath = path.join(__dirname, 'rewardInfo.json');
+// ===================================================
+// 🎁 ECONOMY SYSTEM (SQLite + optional JSON backup)
+// ===================================================
+
 const monthlyAmount = 1000;
 const currency = 'SR £';
-
-function loadBalances() {
-  if (!fs.existsSync(dataPath)) return {};
-  return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-}
-
-function saveBalances(balances) {
-  fs.writeFileSync(dataPath, JSON.stringify(balances, null, 2));
-}
+const rewardInfoPath = path.join(__dirname, 'data', 'rewardInfo.json');
+const backupPath = path.join(__dirname, 'balances.json'); // Manual backup file
 
 function loadRewardInfo() {
-  if (!fs.existsSync(rewardInfoPath)) return { lastRewardYear: 0, lastRewardMonth: 0 };
+  if (!fs.existsSync(rewardInfoPath)) {
+    return { lastRewardYear: 0, lastRewardMonth: 0 };
+  }
   return JSON.parse(fs.readFileSync(rewardInfoPath, 'utf8'));
 }
 
@@ -78,6 +76,7 @@ function saveRewardInfo(info) {
   fs.writeFileSync(rewardInfoPath, JSON.stringify(info, null, 2));
 }
 
+// ✅ SQLite-based monthly rewards
 async function giveMonthlyRewards() {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -90,18 +89,30 @@ async function giveMonthlyRewards() {
     return;
   }
 
-  const balances = loadBalances();
+  const balances = db.getAllBalances();
 
-  for (const userId in balances) {
-    balances[userId] += monthlyAmount;
-    console.log(`Added ${currency}${monthlyAmount} to User ID: ${userId}. New balance: ${currency}${balances[userId]}`);
+  if (balances.length === 0) {
+    console.log('No balances found. Skipping monthly rewards.');
+    return;
   }
 
-  saveBalances(balances);
+  for (const { userId, balance } of balances) {
+    db.setBalance(userId, balance + monthlyAmount);
+    console.log(`Added ${currency}${monthlyAmount} to User ID: ${userId}.`);
+  }
+
   saveRewardInfo({ lastRewardYear: currentYear, lastRewardMonth: currentMonth });
 
-  console.log('✅ Monthly rewards distributed successfully!');
+  // ✅ Optional: auto-backup balances to JSON
+  const updatedBalances = db.getAllBalances();
+  fs.writeFileSync(backupPath, JSON.stringify(updatedBalances, null, 2));
+
+  console.log('✅ Monthly rewards distributed and backup created!');
 }
+
+// ===================================================
+// 🤖 DISCORD BOT EVENTS
+// ===================================================
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -111,8 +122,10 @@ client.once('ready', () => {
     status: 'online',
   });
 
+  // Give monthly rewards on startup
   giveMonthlyRewards();
 
+  // Check every minute for the 1st day at 12:00 PM
   setInterval(() => {
     const now = new Date();
     if (now.getDate() === 1 && now.getHours() === 12 && now.getMinutes() === 0) {
@@ -120,7 +133,7 @@ client.once('ready', () => {
     }
   }, 60 * 1000);
 
-  // 🔔 Start Roblox group tracker
+  // Start Roblox group tracker
   startRobloxTracker(client);
 });
 
