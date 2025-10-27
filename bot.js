@@ -5,12 +5,12 @@ const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js'
 require('dotenv').config();
 
 const startRobloxTracker = require('./robloxGroupTracker');
-const db = require('./db'); // ✅ Use your SQLite system
+const db = require('./db'); // ✅ SQLite wrapper
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Discord client setup
+// ---------------- DISCORD CLIENT ----------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -29,7 +29,7 @@ const philResponses = [
   "Hello, {user}, how can I help?",
 ];
 
-// Command loader
+// ---------------- COMMAND LOADER ----------------
 client.commands = new Collection();
 
 const guildOnlyPath = path.join(__dirname, 'commands', 'guildOnly');
@@ -52,31 +52,27 @@ loadCommands(guildOnlyPath);
 loadCommands(globalPath);
 console.log('Loaded commands:', [...client.commands.keys()]);
 
-// Express web server for uptime
+// ---------------- EXPRESS SERVER ----------------
 app.get('/', (req, res) => res.send('Bot is running'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// ===================================================
-// 🎁 ECONOMY SYSTEM (SQLite + optional JSON backup)
-// ===================================================
-
+// ---------------- ECONOMY CONFIG ----------------
 const monthlyAmount = 1000;
 const currency = 'SR £';
 const rewardInfoPath = path.join(__dirname, 'data', 'rewardInfo.json');
-const backupPath = path.join(__dirname, 'balances.json'); // Manual backup file
 
+// Reward info loader
 function loadRewardInfo() {
-  if (!fs.existsSync(rewardInfoPath)) {
-    return { lastRewardYear: 0, lastRewardMonth: 0 };
-  }
+  if (!fs.existsSync(rewardInfoPath)) return { lastRewardYear: 0, lastRewardMonth: 0 };
   return JSON.parse(fs.readFileSync(rewardInfoPath, 'utf8'));
 }
 
+// Reward info saver
 function saveRewardInfo(info) {
   fs.writeFileSync(rewardInfoPath, JSON.stringify(info, null, 2));
 }
 
-// ✅ SQLite-based monthly rewards
+// Give monthly rewards
 async function giveMonthlyRewards() {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -98,22 +94,19 @@ async function giveMonthlyRewards() {
 
   for (const { userId, balance } of balances) {
     db.setBalance(userId, balance + monthlyAmount);
-    console.log(`Added ${currency}${monthlyAmount} to User ID: ${userId}.`);
+    console.log(`Added ${currency}${monthlyAmount} to User ID: ${userId}`);
   }
 
   saveRewardInfo({ lastRewardYear: currentYear, lastRewardMonth: currentMonth });
 
-  // ✅ Optional: auto-backup balances to JSON
+  // Optional backup to JSON
   const updatedBalances = db.getAllBalances();
-  fs.writeFileSync(backupPath, JSON.stringify(updatedBalances, null, 2));
+  fs.writeFileSync(path.join(__dirname, 'data', 'balances.json'), JSON.stringify(updatedBalances, null, 2));
 
   console.log('✅ Monthly rewards distributed and backup created!');
 }
 
-// ===================================================
-// 🤖 DISCORD BOT EVENTS
-// ===================================================
-
+// ---------------- DISCORD EVENTS ----------------
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
@@ -122,10 +115,14 @@ client.once('ready', () => {
     status: 'online',
   });
 
-  // Give monthly rewards on startup
+  // 🔹 Import balances from JSON on startup
+  const importedCount = db.importBalancesFromFile();
+  console.log(`Imported ${importedCount} balances from JSON`);
+
+  // 🔹 Give monthly rewards
   giveMonthlyRewards();
 
-  // Check every minute for the 1st day at 12:00 PM
+  // Schedule monthly rewards (1st day at 12:00 PM)
   setInterval(() => {
     const now = new Date();
     if (now.getDate() === 1 && now.getHours() === 12 && now.getMinutes() === 0) {
@@ -133,30 +130,26 @@ client.once('ready', () => {
     }
   }, 60 * 1000);
 
-  // Start Roblox group tracker
+  // Start Roblox tracker
   startRobloxTracker(client);
 });
 
+// Handle slash commands
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  console.log(`Interaction received: ${interaction.commandName}`);
-
   const command = client.commands.get(interaction.commandName);
-  if (!command) {
-    console.log(`No command matching ${interaction.commandName} found`);
-    return;
-  }
+  if (!command) return;
 
   try {
     await command.execute(interaction);
-    console.log(`Executed command: ${interaction.commandName}`);
   } catch (error) {
     console.error('Error executing command:', error);
     await interaction.reply({ content: 'Error executing command.', ephemeral: true });
   }
 });
 
+// Fun Phil responses
 client.on('messageCreate', message => {
   if (message.author.bot) return;
 

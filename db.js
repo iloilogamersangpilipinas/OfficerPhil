@@ -1,16 +1,16 @@
-const Database = require('better-sqlite3');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const Database = require('better-sqlite3');
 
-// Ensure the data folder exists
-const dataFolder = path.resolve(__dirname, 'data');
-if (!fs.existsSync(dataFolder)) {
-  fs.mkdirSync(dataFolder);
-}
+// 🔹 Use relative path for deployment compatibility
+const DATA_FOLDER = path.join(__dirname, 'data');
+const DB_FILE = path.join(DATA_FOLDER, 'economy.db');
 
-// Database file path
-const dbPath = path.join(dataFolder, 'economy.db');
-const db = new Database(dbPath);
+// Ensure /data folder exists
+if (!fs.existsSync(DATA_FOLDER)) fs.mkdirSync(DATA_FOLDER);
+
+// Connect to SQLite database
+const db = new Database(DB_FILE);
 
 // Create tables if they don't exist
 db.prepare(`
@@ -28,7 +28,7 @@ db.prepare(`
 `).run();
 
 module.exports = {
-  // BALANCE METHODS
+  // ---------------- BALANCE METHODS ----------------
   getBalance(userId) {
     const row = db.prepare('SELECT balance FROM balances WHERE userId = ?').get(userId);
     return row ? row.balance : 0;
@@ -36,7 +36,7 @@ module.exports = {
 
   setBalance(userId, amount) {
     db.prepare(`
-      INSERT INTO balances (userId, balance) 
+      INSERT INTO balances (userId, balance)
       VALUES (?, ?)
       ON CONFLICT(userId) DO UPDATE SET balance = excluded.balance
     `).run(userId, amount);
@@ -51,7 +51,7 @@ module.exports = {
     return db.prepare('SELECT * FROM balances').all();
   },
 
-  // DAILY CLAIMS METHODS
+  // ---------------- DAILY CLAIMS METHODS ----------------
   getLastDaily(userId) {
     const row = db.prepare('SELECT lastClaim FROM daily_claims WHERE userId = ?').get(userId);
     return row ? row.lastClaim : 0;
@@ -64,4 +64,36 @@ module.exports = {
       ON CONFLICT(userId) DO UPDATE SET lastClaim = excluded.lastClaim
     `).run(userId, timestamp);
   },
+
+  // ---------------- IMPORT JSON BALANCES ----------------
+  importBalancesFromFile() {
+    const BALANCE_FILE = path.join(DATA_FOLDER, 'balances.json');
+    if (!fs.existsSync(BALANCE_FILE)) {
+      console.warn('⚠️ balances.json not found — skipping import.');
+      return 0;
+    }
+
+    let balances;
+    try {
+      balances = JSON.parse(fs.readFileSync(BALANCE_FILE, 'utf8'));
+    } catch (err) {
+      console.error('❌ Failed to parse balances.json:', err);
+      return 0;
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO balances (userId, balance)
+      VALUES (@userId, @balance)
+      ON CONFLICT(userId) DO UPDATE SET balance = excluded.balance
+    `);
+
+    let count = 0;
+    for (const [userId, balance] of Object.entries(balances)) {
+      stmt.run({ userId, balance: Number(balance) || 0 });
+      count++;
+    }
+
+    console.log(`✅ Imported ${count} balances from balances.json`);
+    return count;
+  }
 };
