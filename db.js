@@ -97,3 +97,5 @@ module.exports = {
     return count;
   }
 };
+
+module.exports.importBalancesFromFile();
